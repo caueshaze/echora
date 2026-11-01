@@ -1,0 +1,91 @@
+# === SISTEMA OPERACIONAL ===
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+__MACOSX/
+
+# === EDITOR / IDE ===
+.vscode/
+.history/
+.idea/
+*.swp
+*.swo
+
+# === PYTHON BACKEND ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+.envrc
+!.env.example
+
+# === MODELOS E ARTEFATOS ===
+# Mantém a pasta /models, mas ignora pesos e checkpoints
+models/**/*.onnx
+models/**/*.bin
+models/**/*.pt
+models/**/*.h5
+models/**/*.pkl
+models/**/*.joblib
+models/**/*.safetensors
+models/**/*.json
+models/**/*.txt
+models/**/*.model
+models/*-it/
+!models/.keep 
+models/bert
+
+# === DADOS LOCAIS ===
+data/
+datasets/
+notebooks/
+tmp/
+logs/
+uploads/
+.pytest_cache/
+
+# === FRONTEND (React / Vite / Tailwind) ===
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/.parcel-cache/
+frontend/.next/
+frontend/build/
+
+# === ARQUIVOS DE CONFIG LOCAL ===
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+AGENTS.md
+
+# === LOCKFILES (opcional) ===
+# descomente se quiser evitar travar dependências
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# poetry.lock
+# Pipfile.lock
+
+# === OUTROS ===
+# Arquivos temporários de sistema ou backup
+*.bak
+*.tmp
+*.old
+*.orig
