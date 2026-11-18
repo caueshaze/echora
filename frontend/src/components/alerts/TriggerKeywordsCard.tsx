@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus, Shield, X } from 'lucide-react'
 
 import type { TriggerKeyword } from '../../lib/types'
 
@@ -34,59 +35,59 @@ export function TriggerKeywordsCard({
   }
 
   return (
-    <div className="rounded-2xl border border-rose-200 bg-white shadow-sm p-5 flex flex-col gap-4">
+    <div className="card p-5 sm:p-6 flex flex-col gap-4">
       <div>
-        <div className="flex items-center gap-2 text-rose-600 text-sm font-semibold">
-          <span>🛡️</span>
-          <span>Palavras monitoradas</span>
+        <div className="flex items-center gap-2 text-slate-900 font-semibold">
+          <Shield className="h-4 w-4 text-brand-700 shrink-0" />
+          <h3 className="text-base">Termos sensíveis monitorados</h3>
         </div>
-        <p className="text-sm text-slate-600 mt-1">
-          Termos que disparam alertas instantâneos para {scopeLabel}.
+        <p className="text-sm text-slate-500 mt-1">
+          Palavras que geram sinalização preventiva automática para {scopeLabel}.
         </p>
       </div>
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Nova palavra
-        </label>
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            placeholder="Ex.: ameaça, agressão, arma..."
-            value={keywordInput}
-            onChange={(event) => setKeywordInput(event.target.value)}
-            disabled={submitting}
-            required
-          />
-          <button type="submit" className="btn" disabled={submitting}>
-            {submitting ? 'Salvando...' : 'Adicionar'}
-          </button>
-        </div>
+      <form className="flex flex-col sm:flex-row gap-2" onSubmit={handleSubmit}>
+        <input
+          className="input flex-1"
+          placeholder="Adicionar termo (ex.: bullying, ameaça)..."
+          value={keywordInput}
+          onChange={(event) => setKeywordInput(event.target.value)}
+          disabled={submitting}
+          aria-label="Novo termo monitorado"
+          required
+        />
+        <button type="submit" className="btn shrink-0" disabled={submitting}>
+          <Plus className="h-4 w-4" />
+          {submitting ? 'Salvando...' : 'Adicionar'}
+        </button>
       </form>
 
       {status && <p className="text-xs text-slate-500">{status}</p>}
       {error && <p className="text-xs text-rose-600">{error}</p>}
-      {loading && <p className="text-sm text-slate-500">Carregando palavras...</p>}
+      {loading && <p className="text-sm text-slate-500">Carregando termos...</p>}
 
       {!loading && keywords.length === 0 && (
         <p className="text-sm text-slate-500">
-          Nenhuma palavra configurada ainda. Utilize o formulário para registrar o primeiro termo.
+          Nenhum termo personalizado cadastrado. Os termos padrão de segurança seguem ativos.
         </p>
       )}
 
       {!loading && keywords.length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {keywords.map((keyword) => (
-            <li key={keyword.id} className="flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-sm text-rose-700">
+            <li
+              key={keyword.id}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700"
+            >
               <span>{keyword.keyword}</span>
               <button
                 type="button"
-                className="text-xs text-rose-500 hover:text-rose-800"
+                className="p-0.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                 onClick={() => onDelete(keyword.id)}
                 disabled={submitting}
                 aria-label={`Remover ${keyword.keyword}`}
               >
-                ✕
+                <X className="h-3.5 w-3.5" />
               </button>
             </li>
           ))}

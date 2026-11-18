@@ -22,6 +22,7 @@ export type FeedbackPublic = {
   sentiment_label: string | null
   sentiment_score: number | null
   has_trigger: boolean
+  is_anonymous?: boolean
   manual_trigger_reason?: string | null
   manual_triggered_by?: string | null
   trigger_resolved_at?: string | null
@@ -39,6 +40,7 @@ export type FeedbackCreateInput = {
   target_type: FeedbackTargetType
   target_id: string
   content: string
+  is_anonymous?: boolean
 }
 
 export type DirectoryUser = {

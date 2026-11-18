@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Check } from 'lucide-react'
 
 import { fetchClassroomAssignments, updateClassroomAssignments } from '../../lib/api'
 import type {
@@ -48,11 +49,10 @@ export function ClassroomAssignmentsPanel({
       return
     }
     setLoading(true)
-    setStatus('Carregando atribuições...')
+    setStatus(null)
     fetchClassroomAssignments(selectedClassroomId)
       .then((data) => {
         setAssignments(data)
-        setStatus(null)
       })
       .catch((error: any) => {
         setStatus(error?.message || 'Não foi possível carregar as atribuições desta turma.')
@@ -68,7 +68,9 @@ export function ClassroomAssignmentsPanel({
     setAssignments({
       ...assignments,
       assignments: assignments.assignments.map((entry) =>
-        entry.subject_id === subjectId ? { subject_id: subjectId, teacher_id: teacherId || null } : entry,
+        entry.subject_id === subjectId
+          ? { subject_id: subjectId, teacher_id: teacherId || null }
+          : entry,
       ),
     })
   }
@@ -79,7 +81,7 @@ export function ClassroomAssignmentsPanel({
     setStatus('Salvando atribuições...')
     try {
       await updateClassroomAssignments(selectedClassroomId, assignments)
-      setStatus('Atribuições atualizadas com sucesso!')
+      setStatus('Atribuições salvas com sucesso.')
     } catch (error: any) {
       setStatus(error?.message || 'Não foi possível salvar as atribuições.')
     } finally {
@@ -90,21 +92,27 @@ export function ClassroomAssignmentsPanel({
   const classroomSubjects = selectedClassroom ? selectedClassroom.subject_ids : []
 
   return (
-    <div className="card space-y-4 p-6">
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Atribuições</p>
-        <h3 className="text-2xl font-semibold text-slate-900">Professores por turma</h3>
-        <p className="text-sm text-slate-600">
-          Escolha uma turma, visualize suas matérias e defina qual professor será responsável por cada uma delas.
+    <div className="card space-y-5 p-5 sm:p-6">
+      <div>
+        <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+          Docentes por turma e matéria
+        </h3>
+        <p className="text-sm text-slate-500">
+          Selecione a turma para definir qual professor responde por cada disciplina.
         </p>
-      </header>
-      <div className="space-y-2">
-        <label className="label" htmlFor="assignment_classroom">Turma</label>
+      </div>
+
+      <div className="max-w-md">
+        <label className="label" htmlFor="assignment_classroom">
+          Turma
+        </label>
         <select
           id="assignment_classroom"
           className="input"
           value={selectedClassroomId ?? ''}
-          onChange={(event) => setSelectedClassroomId(event.target.value ? Number(event.target.value) : null)}
+          onChange={(event) =>
+            setSelectedClassroomId(event.target.value ? Number(event.target.value) : null)
+          }
         >
           <option value="">Selecione uma turma...</option>
           {classrooms.map((classroom) => (
@@ -114,75 +122,89 @@ export function ClassroomAssignmentsPanel({
           ))}
         </select>
         {!classrooms.length && (
-          <p className="text-xs text-slate-500">
-            Cadastre turmas na seção "Estrutura Escolar → Turmas" para habilitar as atribuições.
+          <p className="text-xs text-slate-500 mt-1.5">
+            Cadastre turmas antes de configurar atribuições.
           </p>
         )}
       </div>
 
-      {status && <p className="text-sm text-slate-600">{status}</p>}
-      {loading && <p className="text-sm text-slate-600">Carregando dados da turma selecionada...</p>}
+      {status && (
+        <p className="text-xs font-medium text-brand-800 bg-brand-50 border border-brand-200/70 rounded-lg px-3 py-2">
+          {status}
+        </p>
+      )}
+      {loading && <p className="text-sm text-slate-500">Carregando grade da turma...</p>}
 
       {selectedClassroom && classroomSubjects.length === 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-          Esta turma ainda não possui matérias vinculadas. Acesse "Estrutura Escolar → Turmas" para definir a grade antes de criar
-          as atribuições.
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-800">
+          Esta turma ainda não possui disciplinas associadas. Vincule matérias no cadastro de turmas.
         </div>
       )}
 
-      {assignments && classroomSubjects.length > 0 && (
-        <>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Matéria</th>
-                  <th className="px-3 py-2">Professor responsável</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {classroomSubjects.map((subjectId) => {
-                  const subject = subjectMap[subjectId]
-                  const entry = assignments.assignments.find((item) => item.subject_id === subjectId)
-                  const teacherList = (eligibleTeachersBySubject[subjectId] || []).filter(
-                    (teacher) => teacher.school_id === selectedClassroom.school_id,
-                  )
-                  return (
-                    <tr key={subjectId}>
-                      <td className="px-3 py-2 font-medium text-slate-900">{subject?.name ?? `Matéria #${subjectId}`}</td>
-                      <td className="px-3 py-2">
-                        {teacherList.length === 0 ? (
-                          <p className="text-xs text-amber-600">
-                            Nenhum professor habilitado para esta matéria. Ajuste as matérias habilitadas no cadastro de professores.
-                          </p>
-                        ) : (
-                          <select
-                            className="input"
-                            value={entry?.teacher_id ?? ''}
-                            onChange={(event) => handleTeacherChange(subjectId, event.target.value)}
-                            disabled={saving}
-                          >
-                            <option value="">Sem responsável</option>
-                            {teacherList.map((teacher) => (
-                              <option key={teacher.id} value={teacher.id}>
-                                {teacher.full_name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+      {assignments && selectedClassroom && classroomSubjects.length > 0 && (
+        <div className="space-y-4">
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 overflow-hidden bg-white">
+            {classroomSubjects.map((subjectId) => {
+              const subject = subjectMap[subjectId]
+              const entry = assignments.assignments.find((item) => item.subject_id === subjectId)
+              const teacherList = (eligibleTeachersBySubject[subjectId] || []).filter(
+                (teacher) => teacher.school_id === selectedClassroom.school_id,
+              )
+              return (
+                <li
+                  key={subjectId}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {subject?.color && (
+                      <span
+                        className="h-3 w-3 rounded-full shrink-0"
+                        style={{ backgroundColor: subject.color }}
+                      />
+                    )}
+                    <span className="text-sm font-semibold text-slate-900">
+                      {subject?.name ?? `Matéria #${subjectId}`}
+                    </span>
+                  </div>
+
+                  <div className="w-full sm:w-72">
+                    {teacherList.length === 0 ? (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200/70 rounded-lg px-3 py-2">
+                        Nenhum professor habilitado nesta matéria.
+                      </p>
+                    ) : (
+                      <select
+                        className="input"
+                        value={entry?.teacher_id ?? ''}
+                        onChange={(event) => handleTeacherChange(subjectId, event.target.value)}
+                        disabled={saving}
+                      >
+                        <option value="">Sem professor definido</option>
+                        {teacherList.map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
           <div className="flex justify-end">
-            <button className="btn" type="button" onClick={handleSave} disabled={saving || classroomSubjects.length === 0}>
+            <button
+              className="btn w-full sm:w-auto"
+              type="button"
+              onClick={handleSave}
+              disabled={saving || classroomSubjects.length === 0}
+            >
+              <Check className="h-4 w-4" />
               {saving ? 'Salvando...' : 'Salvar atribuições'}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

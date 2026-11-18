@@ -101,12 +101,13 @@ def _run_sqlite_migrations(engine: Engine) -> None:
                 "ON subjects(school_id, code) WHERE code IS NOT NULL"
             )
         )
-        connection.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_subjects_teacher_id "
-                "ON subjects(teacher_id)"
+        if "teacher_id" in subject_columns:
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_subjects_teacher_id "
+                    "ON subjects(teacher_id)"
+                )
             )
-        )
 
         classroom_columns = {
             row[1] for row in connection.execute(text("PRAGMA table_info('classrooms')"))
@@ -134,15 +135,16 @@ def _run_sqlite_migrations(engine: Engine) -> None:
                 """
             )
         )
-        connection.execute(
-            text(
-                """
-                INSERT OR IGNORE INTO classroom_subjects (classroom_id, subject_id)
-                SELECT id, subject_id FROM classrooms
-                WHERE subject_id IS NOT NULL
-                """
+        if "subject_id" in classroom_columns:
+            connection.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO classroom_subjects (classroom_id, subject_id)
+                    SELECT id, subject_id FROM classrooms
+                    WHERE subject_id IS NOT NULL
+                    """
+                )
             )
-        )
         connection.execute(
             text(
                 """
@@ -203,9 +205,10 @@ def _run_sqlite_migrations(engine: Engine) -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN classroom_id INTEGER"))
         if "subject_id" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN subject_id INTEGER"))
-        connection.execute(
-            text("UPDATE users SET subject_id=NULL WHERE role='aluno' AND subject_id IS NOT NULL")
-        )
+        if "subject_id" in user_columns:
+            connection.execute(
+                text("UPDATE users SET subject_id=NULL WHERE role='aluno' AND subject_id IS NOT NULL")
+            )
 
         feedback_columns = {
             row[1] for row in connection.execute(text("PRAGMA table_info('feedbacks')"))
@@ -232,6 +235,10 @@ def _run_sqlite_migrations(engine: Engine) -> None:
             )
         if "trigger_resolved_note" not in feedback_columns:
             connection.execute(text("ALTER TABLE feedbacks ADD COLUMN trigger_resolved_note VARCHAR(255)"))
+        if "is_anonymous" not in feedback_columns:
+            connection.execute(
+                text("ALTER TABLE feedbacks ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT 0")
+            )
 
         feedback_fk_info = list(connection.execute(text("PRAGMA foreign_key_list('feedbacks')")))
 
@@ -266,6 +273,7 @@ def _run_sqlite_migrations(engine: Engine) -> None:
                         sentiment VARCHAR(32),
                         category VARCHAR(64),
                         has_trigger BOOLEAN NOT NULL DEFAULT 0,
+                        is_anonymous BOOLEAN NOT NULL DEFAULT 0,
                         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         sentiment_label VARCHAR(32),
                         sentiment_score FLOAT,
@@ -294,6 +302,7 @@ def _run_sqlite_migrations(engine: Engine) -> None:
                         sentiment,
                         category,
                         has_trigger,
+                        is_anonymous,
                         created_at,
                         sentiment_label,
                         sentiment_score,
@@ -313,6 +322,7 @@ def _run_sqlite_migrations(engine: Engine) -> None:
                         sentiment,
                         category,
                         has_trigger,
+                        is_anonymous,
                         created_at,
                         sentiment_label,
                         sentiment_score,

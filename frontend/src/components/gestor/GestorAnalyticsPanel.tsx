@@ -22,47 +22,42 @@ function ChartCard({
   dataset,
   metricLabel,
   metricAccessor,
-  colorClass = 'bg-slate-900/70',
+  colorClass = 'bg-brand-600',
   onSelectUser,
 }: ChartCardProps) {
   const maxValue = dataset.reduce((max, item) => Math.max(max, metricAccessor(item)), 1)
   return (
-    <div className="card p-5 space-y-3">
+    <div className="card p-5 space-y-3.5">
       <div>
-        <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">{title}</p>
-        <p className="text-sm text-slate-600">{subtitle}</p>
+        <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+        <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
       </div>
       {dataset.length === 0 ? (
-        <p className="text-sm text-slate-500">Sem dados suficientes para este gráfico.</p>
+        <p className="text-xs text-slate-400 py-3">Ainda não há volume suficiente.</p>
       ) : (
         <ul className="space-y-3">
           {dataset.map((item, index) => {
             const value = metricAccessor(item)
             return (
-              <li key={item.id} className="space-y-1">
-                <div className="flex items-center justify-between text-sm text-slate-700">
+              <li key={item.id} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-sm">
                   <button
                     type="button"
-                    className="font-medium text-left text-slate-900 hover:text-rose-600 transition"
+                    className="font-medium text-left text-slate-800 hover:text-brand-700 truncate transition-colors"
                     onClick={() => onSelectUser(item.id)}
                   >
                     {index + 1}. {item.name}
                   </button>
-                  <span className="text-xs text-slate-500">
-                    {value} {metricLabel.toLowerCase()}
+                  <span className="text-xs text-slate-500 tabular-nums shrink-0">
+                    {value} {metricLabel}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${colorClass}`}
                     style={{ width: `${(value / maxValue) * 100}%` }}
                   />
                 </div>
-                {item.role && (
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">
-                    Perfil: {item.role}
-                  </p>
-                )}
               </li>
             )
           })}
@@ -79,58 +74,66 @@ function ProfessorSentimentCard({
   dataset: UserAggregate[]
   onSelectUser: (userId: string) => void
 }) {
-  const maxValue = dataset.reduce((max, item) => Math.max(max, item.received), 1)
   return (
-    <div className="card p-5 space-y-3">
+    <div className="card p-5 space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">
-          Professores em destaque
-        </p>
-        <p className="text-sm text-slate-600">
-          Distribuição de sentimento para os professores com mais retornos.
+        <h4 className="text-sm font-semibold text-slate-900">
+          Distribuição de retornos por docente
+        </h4>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Proporção entre relatos positivos, neutros e pontos de atenção.
         </p>
       </div>
       {dataset.length === 0 ? (
-        <p className="text-sm text-slate-500">Sem feedbacks associados a professores.</p>
+        <p className="text-xs text-slate-400 py-3">Sem relatos vinculados a docentes ainda.</p>
       ) : (
-        <ul className="space-y-3">
-          {dataset.map((item, index) => {
-            const toPercent = (value: number) => (item.received === 0 ? 0 : (value / item.received) * 100)
+        <ul className="space-y-4">
+          {dataset.map((item) => {
+            const toPercent = (value: number) =>
+              item.received === 0 ? 0 : (value / item.received) * 100
             return (
-              <li key={item.id} className="space-y-1">
-                <div className="flex items-center justify-between text-sm text-slate-700">
+              <li key={item.id} className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
                   <button
                     type="button"
-                    className="font-medium text-left text-slate-900 hover:text-rose-600 transition"
+                    className="font-medium text-left text-slate-800 hover:text-brand-700 transition-colors"
                     onClick={() => onSelectUser(item.id)}
                   >
-                    {index + 1}. {item.name}
+                    {item.name}
                   </button>
-                  <span className="text-xs text-slate-500">{item.received} feedbacks</span>
+                  <span className="text-xs text-slate-500 tabular-nums">
+                    {item.received} relato(s)
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-100 overflow-hidden flex">
                   <div
-                    className="h-full bg-emerald-400"
+                    className="h-full bg-emerald-500"
                     style={{ width: `${toPercent(item.positiveReceived)}%` }}
                     title="Positivos"
                   />
                   <div
-                    className="h-full bg-slate-400"
+                    className="h-full bg-slate-300"
                     style={{ width: `${toPercent(item.neutralReceived)}%` }}
                     title="Neutros"
                   />
                   <div
-                    className="h-full bg-rose-400"
+                    className="h-full bg-rose-500"
                     style={{ width: `${toPercent(item.negativeReceived)}%` }}
-                    title="Negativos"
+                    title="Atenção"
                   />
                 </div>
-                <div className="flex flex-wrap gap-3 text-[11px] uppercase tracking-wide text-slate-500">
-                  <span>Positivos: {item.positiveReceived}</span>
-                  <span>Neutros: {item.neutralReceived}</span>
-                  <span>Negativos: {item.negativeReceived}</span>
-                  <span className="ml-auto text-slate-400">
-                    {(item.received / maxValue * 100).toFixed(0)}% da liderança
+                <div className="flex flex-wrap gap-3 text-[11px] text-slate-500 tabular-nums">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Positivos: {item.positiveReceived}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    Neutros: {item.neutralReceived}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                    Atenção: {item.negativeReceived}
                   </span>
                 </div>
               </li>
@@ -142,84 +145,84 @@ function ProfessorSentimentCard({
   )
 }
 
-export function GestorAnalyticsPanel({ loading, analytics, onSelectUser }: GestorAnalyticsPanelProps) {
+export function GestorAnalyticsPanel({
+  loading,
+  analytics,
+  onSelectUser,
+}: GestorAnalyticsPanelProps) {
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-wide text-rose-600 font-semibold">
-            Panorama analítico
-          </p>
-          <h3 className="text-xl font-semibold text-slate-900">
-            Quem tem demandado mais atenção na rede
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+            Participação e demanda de acompanhamento
           </h3>
-          <p className="text-sm text-slate-600">
-            Use os gráficos para priorizar atendimentos e identificar padrões de risco.
+          <p className="text-xs sm:text-sm text-slate-500">
+            Toque em qualquer nome para consultar o histórico individual.
           </p>
         </div>
-        <span className="text-xs text-slate-500">
-          {loading ? 'Atualizando...' : 'Dados em tempo real'}
-        </span>
+        {loading && <span className="text-xs text-slate-400">Sincronizando...</span>}
       </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <ChartCard
-          title="Top 5 remetentes"
-          subtitle="Usuários que mais enviaram feedbacks."
+          title="Maior participação (envios)"
+          subtitle="Quem mais registrou percepções recentemente."
           dataset={analytics.topSenders}
-          metricLabel="Feedbacks enviados"
+          metricLabel="envios"
           metricAccessor={(item) => item.sent}
           onSelectUser={onSelectUser}
         />
         <ChartCard
-          title="Top 5 destinatários"
-          subtitle="Quem mais recebeu feedbacks recentemente."
+          title="Mais mencionados (recebidos)"
+          subtitle="Pessoas com maior volume de retornos diretos."
           dataset={analytics.topRecipients}
-          metricLabel="Feedbacks recebidos"
+          metricLabel="recebidos"
           metricAccessor={(item) => item.received}
           onSelectUser={onSelectUser}
         />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
         <ChartCard
-          title="Alunos mais elogiados"
-          subtitle="Top 5 estudantes com maior volume de elogios."
+          title="Estudantes com destaques positivos"
+          subtitle="Alunos que mais receberam reconhecimentos."
           dataset={analytics.praisedStudents}
-          metricLabel="Elogios"
+          metricLabel="elogios"
           metricAccessor={(item) => item.positiveReceived}
           colorClass="bg-emerald-500"
           onSelectUser={onSelectUser}
         />
         <ChartCard
-          title="Professores mais elogiados"
-          subtitle="Educadores com mais retornos positivos."
+          title="Docentes mais reconhecidos"
+          subtitle="Professores com maior volume de elogios."
           dataset={analytics.praisedTeachers}
-          metricLabel="Elogios"
+          metricLabel="elogios"
           metricAccessor={(item) => item.positiveReceived}
           colorClass="bg-emerald-600"
           onSelectUser={onSelectUser}
         />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
         <ChartCard
-          title="Alunos mais pressionados"
-          subtitle="Estudantes com mais feedbacks negativos."
+          title="Estudantes que pedem atenção"
+          subtitle="Alunos com maior incidência de apontamentos críticos."
           dataset={analytics.pressuredStudents}
-          metricLabel="Feedbacks negativos"
+          metricLabel="alertas"
           metricAccessor={(item) => item.negativeReceived}
-          colorClass="bg-rose-400"
+          colorClass="bg-amber-500"
           onSelectUser={onSelectUser}
         />
         <ChartCard
-          title="Professores mais pressionados"
-          subtitle="Educadores que precisam de suporte imediato."
+          title="Docentes sob maior demanda"
+          subtitle="Educadores que podem precisar de apoio pedagógico."
           dataset={analytics.pressuredTeachers}
-          metricLabel="Feedbacks negativos"
+          metricLabel="apontamentos"
           metricAccessor={(item) => item.negativeReceived}
           colorClass="bg-rose-500"
           onSelectUser={onSelectUser}
         />
       </div>
-      <ProfessorSentimentCard dataset={analytics.professorSentiments} onSelectUser={onSelectUser} />
+
+      <ProfessorSentimentCard
+        dataset={analytics.professorSentiments}
+        onSelectUser={onSelectUser}
+      />
     </section>
   )
 }

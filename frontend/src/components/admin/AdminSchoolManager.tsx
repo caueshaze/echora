@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Building2, Pencil, Search, Trash2 } from 'lucide-react'
 
 import {
   createSchool,
@@ -17,6 +18,7 @@ export function AdminSchoolManager() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
   const buildEmptyForm = (): FormState => ({
     id: null,
     name: '',
@@ -61,10 +63,10 @@ export function AdminSchoolManager() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!form.name.trim()) {
-      setStatus('Informe o nome da escola.')
+      setStatus('Informe o nome da instituição.')
       return
     }
-    setStatus(form.id ? 'Atualizando...' : 'Cadastrando...')
+    setStatus(form.id ? 'Atualizando dados...' : 'Cadastrando unidade...')
     const payload = {
       name: form.name.trim(),
       code: form.code?.trim() || undefined,
@@ -83,9 +85,9 @@ export function AdminSchoolManager() {
       }
       setForm(buildEmptyForm())
       await loadSchools()
-      setStatus(form.id ? 'Escola atualizada.' : 'Escola cadastrada.')
+      setStatus(form.id ? 'Unidade atualizada com sucesso.' : 'Unidade cadastrada com sucesso.')
     } catch (err: any) {
-      setStatus(err?.message || 'Não foi possível salvar a escola.')
+      setStatus(err?.message || 'Não foi possível salvar a unidade.')
     }
   }
 
@@ -101,183 +103,223 @@ export function AdminSchoolManager() {
       city: school.city ?? '',
       state: school.state ?? '',
     })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleDelete = async (schoolId: number) => {
-    if (!window.confirm('Deseja remover esta escola?')) return
-    setStatus('Removendo escola...')
+    if (!window.confirm('Deseja remover esta unidade escolar?')) return
+    setStatus('Removendo unidade...')
     try {
       await deleteSchool(schoolId)
       await loadSchools()
-      setStatus('Escola removida.')
+      setStatus('Unidade removida.')
     } catch (err: any) {
-      const status = (err as ApiError)?.status
+      const code = (err as ApiError)?.status
       setStatus(
-        status === 409
-          ? '⚠️ Não é possível remover a escola enquanto houver usuários, turmas ou matérias vinculados.'
-          : err?.message || 'Não foi possível remover a escola.',
+        code === 409
+          ? 'Não é possível remover uma unidade que já possui turmas, matérias ou usuários vinculados.'
+          : err?.message || 'Não foi possível remover a unidade.',
       )
     }
   }
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wide text-rose-200">Cadastro institucional</p>
-        <h3 className="text-2xl font-semibold text-white">Escolas e unidades</h3>
-        <p className="text-sm text-slate-300">
-          Gerencie todas as instituições conectadas ao Echora. Este painel é exclusivo para
-          mantenedores e administradores globais.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <section className="card p-5 sm:p-6 space-y-5">
+        <div>
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+            {form.id ? 'Editar unidade escolar' : 'Cadastrar nova unidade'}
+          </h2>
+          <p className="text-sm text-slate-500">
+            Adicione ou atualize as instituições habilitadas na plataforma.
+          </p>
+        </div>
 
-      <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">Nome</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.name}
-            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-            required
-          />
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">Código</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.code ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="text-xs uppercase tracking-wide text-slate-300">Descrição</label>
-          <textarea
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none h-24"
-            value={form.description ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">E-mail de contato</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.contact_email ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, contact_email: event.target.value }))}
-            type="email"
-          />
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">Telefone</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.contact_phone ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, contact_phone: event.target.value }))}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="text-xs uppercase tracking-wide text-slate-300">Endereço</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.address ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">Cidade</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.city ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-300">Estado/UF</label>
-          <input
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none"
-            value={form.state ?? ''}
-            onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
-          />
-        </div>
-        <div className="flex gap-3 md:col-span-2">
-          <button
-            type="submit"
-            className="rounded-2xl bg-white text-slate-900 font-semibold px-6 py-2 hover:bg-slate-100 disabled:opacity-60"
-            disabled={loading}
-          >
-            {form.id ? 'Atualizar' : 'Cadastrar'}
-          </button>
-          {form.id && (
-            <button
-              type="button"
-              className="rounded-2xl border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/10"
-            onClick={() => setForm(buildEmptyForm())}
-            >
-              Cancelar
-            </button>
-          )}
-        </div>
-      </form>
-      {status && <p className="text-sm text-slate-300">{status}</p>}
-      {error && <p className="text-sm text-rose-300">{error}</p>}
-
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-300">Escolas cadastradas</p>
-            <p className="text-sm text-slate-400">
-              {filtered.length} resultado(s) · {schools.length} no total
+            <label className="label">Nome da instituição</label>
+            <input
+              className="input"
+              placeholder="Ex.: Colégio Horizonte"
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Código identificador</label>
+            <input
+              className="input"
+              placeholder="Ex.: CH-01"
+              value={form.code ?? ''}
+              onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">E-mail institucional</label>
+            <input
+              className="input"
+              type="email"
+              placeholder="secretaria@escola.edu.br"
+              value={form.contact_email ?? ''}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, contact_email: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="label">Telefone</label>
+            <input
+              className="input"
+              placeholder="(11) 3000-0000"
+              value={form.contact_phone ?? ''}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, contact_phone: event.target.value }))
+              }
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Endereço</label>
+            <input
+              className="input"
+              placeholder="Rua, número e bairro"
+              value={form.address ?? ''}
+              onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Cidade</label>
+            <input
+              className="input"
+              value={form.city ?? ''}
+              onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">UF</label>
+            <input
+              className="input"
+              maxLength={2}
+              placeholder="SP"
+              value={form.state ?? ''}
+              onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Observações</label>
+            <textarea
+              className="input min-h-[80px]"
+              value={form.description ?? ''}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, description: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 pt-1">
+            <div>
+              {status && <p className="text-sm text-slate-600">{status}</p>}
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              {form.id && (
+                <button
+                  type="button"
+                  className="btn-secondary flex-1 sm:flex-initial"
+                  onClick={() => setForm(buildEmptyForm())}
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                type="submit"
+                className="btn flex-1 sm:flex-initial"
+                disabled={loading}
+              >
+                <Building2 className="h-4 w-4" strokeWidth={1.75} />
+                {form.id ? 'Salvar alterações' : 'Cadastrar unidade'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section className="card p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900">Unidades registradas</h3>
+            <p className="text-xs text-slate-500">
+              {filtered.length} de {schools.length} unidade(s)
             </p>
           </div>
-          <input
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none w-full md:w-64"
-            placeholder="Buscar por nome ou código..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+          <div className="relative w-full sm:w-64">
+            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              className="input pl-9"
+              placeholder="Buscar nome ou código..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-300">Carregando escolas...</p>
+          <p className="text-sm text-slate-500 py-4">Carregando unidades...</p>
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-slate-300">Nenhuma escola encontrada.</p>
+          <p className="text-sm text-slate-500 py-6 text-center border border-dashed border-slate-200 rounded-xl">
+            Nenhuma unidade escolar encontrada.
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-slate-300">
-                <tr>
-                  <th className="px-3 py-2">Nome</th>
-                  <th className="px-3 py-2">Código</th>
-                  <th className="px-3 py-2 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {filtered.map((school) => (
-                  <tr key={school.id}>
-                    <td className="px-3 py-3 text-white font-medium">{school.name}</td>
-                    <td className="px-3 py-3 text-slate-300">{school.code || '—'}</td>
-                    <td className="px-3 py-3 text-right flex gap-3 justify-end">
-                      <button
-                        type="button"
-                        className="text-xs text-slate-200 hover:text-white"
-                        onClick={() => handleEdit(school)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-rose-300 hover:text-rose-100"
-                        onClick={() => handleDelete(school.id)}
-                      >
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 overflow-hidden">
+            {filtered.map((school) => (
+              <li
+                key={school.id}
+                className="p-4 bg-white hover:bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{school.name}</p>
+                    {school.code && (
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                        {school.code}
+                      </span>
+                    )}
+                  </div>
+                  {(school.city || school.contact_email) && (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {[
+                        school.city && school.state ? `${school.city}/${school.state}` : school.city,
+                        school.contact_email,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => handleEdit(school)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                    onClick={() => handleDelete(school.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Excluir
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
-    </section>
+      </section>
+    </div>
   )
 }

@@ -2,11 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-.card { @apply bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-200; }
-.btn  { @apply px-4 py-2 rounded-xl text-white font-medium bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400; }
-.input { @apply w-full px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-slate-400; }
-.label { @apply text-sm text-slate-600; }
-.tag { @apply px-2 py-0.5 rounded-full text-xs font-medium; }
-.tag-pos { @apply bg-emerald-100 text-emerald-700; }
-.tag-neu { @apply bg-sky-100 text-sky-700; }
-.tag-neg { @apply bg-rose-100 text-rose-700; }
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight text-slate-900;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl shadow-soft border border-slate-200/80;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-700 hover:bg-brand-800 active:bg-brand-900 transition-colors disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2.5 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input {
+    @apply w-full min-h-[42px] px-3.5 py-2.5 rounded-lg bg-white border border-slate-200 text-base md:text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15 disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
+  }
+
+  .tag {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  .tag-pos {
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/70;
+  }
+
+  .tag-neu {
+    @apply bg-slate-100 text-slate-700 border border-slate-200/70;
+  }
+
+  .tag-neg {
+    @apply bg-rose-50 text-rose-700 border border-rose-200/70;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

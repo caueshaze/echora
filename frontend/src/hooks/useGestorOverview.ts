@@ -149,13 +149,18 @@ export function useGestorOverview({ isAdmin, managerSchoolId, adminSchoolFilterI
     }
 
     feedbacks.forEach((feedback) => {
-      const sender = ensureUser(
-        feedback.sender_id,
-        feedback.sender_name,
-        feedback.sender_role,
-        feedback.sender_email,
-      )
-      sender.sent += 1
+      const skipSenderRanking =
+        feedback.sender_id === 'anonymous' || (Boolean(feedback.is_anonymous) && !isAdmin)
+
+      if (!skipSenderRanking) {
+        const sender = ensureUser(
+          feedback.sender_id,
+          feedback.sender_name,
+          feedback.sender_role,
+          feedback.sender_email,
+        )
+        sender.sent += 1
+      }
 
       if (feedback.target_type === 'user') {
         const target = ensureUser(

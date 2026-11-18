@@ -50,7 +50,7 @@ def update_user(
 @router.get(
     "",
     response_model=list[UserPublic],
-    summary="Lista usuários com paginação básica",
+    summary="Lista usuários com paginação e filtros por turma/escola/busca",
 )
 def list_users(
     current_user: UserPublic = Depends(
@@ -58,8 +58,11 @@ def list_users(
     ),
     db: Session = Depends(get_session),
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     role: str | None = Query(default=None),
+    classroom_id: int | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    search: str | None = Query(default=None),
 ) -> list[UserPublic]:
     normalized_role = normalize_role_param(role)
     if normalized_role is None and role is not None:
@@ -71,6 +74,9 @@ def list_users(
         db=db,
         current_user=current_user,
         normalized_role=normalized_role,
+        classroom_id=classroom_id,
+        school_id=school_id,
+        search=search,
         offset=offset,
         limit=limit,
     )

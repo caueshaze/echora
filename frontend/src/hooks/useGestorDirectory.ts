@@ -146,6 +146,7 @@ export function useGestorDirectory({ isAdmin, isManager, managerSchoolId }: UseG
   const [classroomForm, setClassroomForm] = useState<ClassroomFormState>({
     name: '',
     code: '',
+    grade_level: '',
     school_id: managerSchoolValue,
     subject_ids: [],
   })

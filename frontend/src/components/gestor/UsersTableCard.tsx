@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Pencil, Search, Trash2 } from 'lucide-react'
 
 import type { AdminRole, Classroom, DirectoryUser, School, Subject } from '../../lib/types'
 
@@ -33,13 +34,8 @@ export function UsersTableCard({
   schoolMap,
   subjectMap,
   classroomMap,
-  tone = 'light',
 }: UsersTableCardProps) {
   const [search, setSearch] = useState('')
-  const isDark = tone === 'dark'
-  const containerClass = isDark
-    ? 'rounded-3xl border border-white/10 bg-white/5 p-6 space-y-5'
-    : 'card p-6 space-y-5'
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -69,137 +65,158 @@ export function UsersTableCard({
   }, [users])
 
   return (
-    <div className={containerClass}>
+    <div className="card p-5 sm:p-6 space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className={`text-xs uppercase tracking-wide font-semibold ${isDark ? 'text-rose-200' : 'text-rose-600'}`}>Diretório</p>
-          <h3 className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pessoas conectadas à rede</h3>
-          <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Use os filtros rápidos ou a busca inteligente para localizar qualquer perfil.
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+            Diretório de pessoas
+          </h3>
+          <p className="text-sm text-slate-500">
+            Consulte e gerencie o cadastro de alunos, docentes e coordenação.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <div className="flex flex-wrap gap-2">
-            {(['all', ...ROLE_ORDER] as const).map((roleKey) => (
-              <button
-                key={roleKey}
-                type="button"
-                onClick={() => onChangeRoleFilter(roleKey)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  roleFilter === roleKey
-                    ? 'bg-slate-900 text-white shadow'
-                    : isDark
-                      ? 'bg-white/10 text-slate-200 hover:bg-white/20'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {roleKey === 'all' ? 'Todos' : roleLabel(roleKey)}{' '}
-                {roleKey === 'all' ? users.length : totalByRole[roleKey as AdminRole]}
-              </button>
-            ))}
-          </div>
+
+        <div className="relative w-full lg:w-72">
+          <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
-            className={
-              isDark
-                ? 'w-full sm:w-64 rounded-2xl border border-white/10 bg-white/5 text-white placeholder-slate-400 px-4 py-2 focus:outline-none focus:border-white/40'
-                : 'input w-full sm:w-64'
-            }
-            placeholder="Buscar por nome ou e-mail..."
+            className="input pl-9"
+            placeholder="Buscar nome ou e-mail..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
       </div>
 
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        {(['all', ...ROLE_ORDER] as const).map((roleKey) => {
+          const active = roleFilter === roleKey
+          const count = roleKey === 'all' ? users.length : totalByRole[roleKey]
+          return (
+            <button
+              key={roleKey}
+              type="button"
+              onClick={() => onChangeRoleFilter(roleKey)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                active
+                  ? 'bg-brand-700 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              <span>{roleKey === 'all' ? 'Todos' : roleLabel(roleKey)}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded text-[11px] tabular-nums ${
+                  active ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       {userActionStatus && (
-        <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{userActionStatus}</p>
+        <p className="text-xs font-medium text-brand-800 bg-brand-50 border border-brand-200/70 rounded-lg px-3 py-2">
+          {userActionStatus}
+        </p>
       )}
-      {error && <p className={`text-sm ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>}
-      {loading && <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Carregando usuários...</p>}
+      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {loading && <p className="text-sm text-slate-500 py-4">Carregando diretório...</p>}
+
       {!loading && filteredUsers.length === 0 && !error && (
-        <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-          Não encontramos usuários com os filtros aplicados. Ajuste a busca ou selecione outro perfil.
+        <p className="text-sm text-slate-500 py-6 text-center border border-dashed border-slate-200 rounded-xl">
+          Nenhum usuário encontrado com os filtros selecionados.
         </p>
       )}
 
-      <div className="space-y-4">
-        {groupedUsers.map(({ role, label, items }) => (
-          <section
-            key={role}
-            className={`rounded-2xl border px-4 py-3 ${isDark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50/70'}`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{label}</p>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{items.length} usuário(s)</p>
-              </div>
-            </div>
-            {items.length === 0 ? (
-              <p className={`px-4 pb-4 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Nenhum registro listado neste grupo.
-              </p>
-            ) : (
-              <ul className={`divide-y rounded-2xl ${isDark ? 'divide-white/10 bg-white/5' : 'divide-slate-200 bg-white'}`}>
-                {items.map((user) => (
-                  <li key={user.id} className="p-4 flex flex-col gap-3">
-                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.full_name}</p>
-                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{user.email}</p>
-                      </div>
-                      <div className={`flex gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {user.school_id && (
-                          <span>{schoolMap[user.school_id]?.name ?? `Escola #${user.school_id}`}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className={`grid gap-2 text-xs sm:grid-cols-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      <p>
-                        <span className={isDark ? 'font-semibold text-slate-400' : 'font-semibold text-slate-500'}>
-                          Unidade:{' '}
-                        </span>
-                        {user.school_id ? schoolMap[user.school_id]?.name ?? `Escola #${user.school_id}` : '—'}
-                      </p>
-                      <p>
-                        <span className={isDark ? 'font-semibold text-slate-400' : 'font-semibold text-slate-500'}>
-                          Perfil:{' '}
-                        </span>
-                        {roleLabel(user.role)}
-                      </p>
-                      <p className="sm:col-span-2">
-                        <span className={isDark ? 'font-semibold text-slate-400' : 'font-semibold text-slate-500'}>
-                          {user.role === 'aluno' ? 'Turma' : 'Matérias habilitadas'}:{' '}
-                        </span>
-                        {user.role === 'aluno'
-                          ? renderClassrooms(user, classroomMap)
-                          : renderSubjects(user, subjectMap)}
-                      </p>
-                    </div>
-                    <div className="flex gap-3 justify-end">
-                      <button
-                        className={`text-sm ${isDark ? 'text-slate-200 hover:text-white' : 'text-slate-600 hover:text-slate-900'} disabled:text-slate-400`}
-                        type="button"
-                        disabled={user.role === 'admin'}
-                        onClick={() => onEditUser(user)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className={`text-sm ${isDark ? 'text-rose-300 hover:text-rose-100' : 'text-rose-600 hover:text-rose-800'} disabled:text-slate-400`}
-                        type="button"
-                        disabled={String(sessionUserId) === String(user.id) || user.role === 'admin'}
-                        onClick={() => onDeleteUser(user.id)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-      </div>
+      {!loading && filteredUsers.length > 0 && (
+        <div className="space-y-4">
+          {groupedUsers
+            .filter(({ items }) => roleFilter !== 'all' || items.length > 0)
+            .map(({ role, label, items }) => (
+              <section
+                key={role}
+                className="rounded-xl border border-slate-200/80 overflow-hidden bg-white"
+              >
+                <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-200/70 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    {label}
+                  </span>
+                  <span className="text-xs text-slate-400 tabular-nums">
+                    {items.length} registro(s)
+                  </span>
+                </div>
+
+                {items.length === 0 ? (
+                  <p className="p-4 text-sm text-slate-500">Nenhum cadastro neste perfil.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {items.map((user) => {
+                      const canEdit = user.role !== 'admin'
+                      const canDelete =
+                        String(sessionUserId) !== String(user.id) && user.role !== 'admin'
+                      return (
+                        <li
+                          key={user.id}
+                          className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/40 transition-colors"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-900 truncate">
+                                {user.full_name}
+                              </p>
+                              {user.school_id && (
+                                <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                                  {schoolMap[user.school_id]?.name ?? `Unidade #${user.school_id}`}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                            {user.role !== 'admin' && user.role !== 'gestor' && (
+                              <p className="text-xs text-slate-500">
+                                <span className="font-medium text-slate-600">
+                                  {user.role === 'aluno' ? 'Turma:' : 'Matérias:'}
+                                </span>{' '}
+                                {user.role === 'aluno'
+                                  ? renderClassrooms(user, classroomMap)
+                                  : renderSubjects(user, subjectMap)}
+                              </p>
+                            )}
+                          </div>
+
+                          {(canEdit || canDelete) && (
+                            <div className="flex items-center gap-2 shrink-0 sm:self-center">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditUser(user)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                  Editar
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteUser(user.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  Excluir
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </section>
+            ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -208,19 +225,12 @@ function renderClassrooms(user: DirectoryUser, classroomMap: Record<number, Clas
   if (user.classroom_id) {
     return classroomMap[user.classroom_id]?.name ?? `Turma #${user.classroom_id}`
   }
-  return '—'
+  return 'Não vinculada'
 }
 
 function renderSubjects(user: DirectoryUser, subjectMap: Record<number, Subject>) {
-  if (user.role !== 'professor') {
-    return user.teachable_subject_ids && user.teachable_subject_ids.length > 0
-      ? user.teachable_subject_ids
-          .map((subjectId) => subjectMap[subjectId]?.name ?? `Matéria #${subjectId}`)
-          .join(', ')
-      : '—'
-  }
   const list = user.teachable_subject_ids || []
-  if (!list.length) return '—'
+  if (!list.length) return 'Nenhuma selecionada'
   return list.map((subjectId) => subjectMap[subjectId]?.name ?? `Matéria #${subjectId}`).join(', ')
 }
 

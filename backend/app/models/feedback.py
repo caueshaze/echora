@@ -45,6 +45,9 @@ class Feedback(Base):
     has_trigger: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
+    is_anonymous: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     manual_trigger_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     manual_triggered_by: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

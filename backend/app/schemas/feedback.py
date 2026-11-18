@@ -10,6 +10,10 @@ class FeedbackCreate(BaseModel):
     target_type: Literal["user", "class", "subject"]
     target_id: Union[str, int] = Field(..., description="Identificador do destino")
     content: str = Field(..., min_length=1, description="Conteúdo em texto puro")
+    is_anonymous: bool = Field(
+        default=False,
+        description="Oculta a autoria para não-administradores (exclusivo para alunos)",
+    )
 
 
 class FeedbackReport(BaseModel):
@@ -43,6 +47,7 @@ class FeedbackPublic(BaseModel):
     sentiment_label: str | None = None
     sentiment_score: float | None = None
     has_trigger: bool = False
+    is_anonymous: bool = False
     manual_trigger_reason: str | None = None
     manual_triggered_by: str | None = None
     trigger_resolved_at: datetime | None = None

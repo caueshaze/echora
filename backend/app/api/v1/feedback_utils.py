@@ -69,6 +69,16 @@ def _serialize_feedback(
         getattr(feedback, "target", None), "school_id", None
     )
 
+    is_anonymous = bool(getattr(feedback, "is_anonymous", False))
+    is_admin_viewer = viewer is not None and viewer.role == "admin"
+    is_sender_viewer = viewer is not None and str(viewer.id) == str(feedback.sender_id)
+    mask_sender_identity = is_anonymous and not is_admin_viewer and not is_sender_viewer
+
+    out_sender_id = "anonymous" if mask_sender_identity else feedback.sender_id
+    out_sender_name = "Estudante (Anônimo)" if mask_sender_identity else resolved_sender
+    out_sender_email = None if mask_sender_identity else resolved_sender_email
+    out_sender_role = "aluno" if mask_sender_identity else resolved_sender_role
+
     sentiment_value = None if hide_sentiment else feedback.sentiment
     category_value = None if hide_sentiment else feedback.category
     sentiment_label_value = None if hide_sentiment else feedback.sentiment_label
@@ -76,10 +86,10 @@ def _serialize_feedback(
 
     return FeedbackPublic(
         id=feedback.id,
-        sender_id=feedback.sender_id,
-        sender_name=resolved_sender,
-        sender_role=resolved_sender_role,
-        sender_email=resolved_sender_email,
+        sender_id=out_sender_id,
+        sender_name=out_sender_name,
+        sender_role=out_sender_role,
+        sender_email=out_sender_email,
         sender_school_id=resolved_sender_school,
         target_type=feedback.target_type,
         target_id=feedback.target_id,
@@ -93,6 +103,7 @@ def _serialize_feedback(
         sentiment_label=sentiment_label_value,
         sentiment_score=sentiment_score_value,
         has_trigger=feedback.has_trigger,
+        is_anonymous=is_anonymous,
         manual_trigger_reason=feedback.manual_trigger_reason,
         manual_triggered_by=feedback.manual_triggered_by,
         trigger_resolved_at=feedback.trigger_resolved_at,

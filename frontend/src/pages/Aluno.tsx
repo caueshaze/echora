@@ -1,26 +1,39 @@
-// src/pages/Aluno.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Home, Inbox, PenSquare, Send, Sparkles } from 'lucide-react'
 
-import Header from '../components/Header'
 import { FeedbackComposer } from '../components/feedback/FeedbackComposer'
-import { useAuth } from '../context/AuthContext'
-import { usePersonalFeedbacks } from '../hooks/usePersonalFeedbacks'
-import { PersonalHero } from '../components/personal/PersonalHero'
-import { PersonalOverview } from '../components/personal/PersonalOverview'
+import { AppShell, type NavItem } from '../components/layout/AppShell'
 import { FeedbackListSection } from '../components/personal/FeedbackListSection'
+import { PersonalOverview } from '../components/personal/PersonalOverview'
 import { PersonalSummaryCard } from '../components/personal/PersonalSummaryCard'
 import { PersonalWelcome } from '../components/personal/PersonalWelcome'
+import { useAuth } from '../context/AuthContext'
+import { usePersonalFeedbacks } from '../hooks/usePersonalFeedbacks'
 
-type Section = 'welcome' | 'overview' | 'compose' | 'received' | 'sent' | 'insights'
+type Section = 'welcome' | 'compose' | 'received' | 'sent' | 'insights'
 
-const SECTIONS: Array<{ id: Section; label: string; icon: string }> = [
-  { id: 'welcome', label: 'Início', icon: '👋' },
-  { id: 'overview', label: 'Resumo', icon: '📊' },
-  { id: 'compose', label: 'Enviar', icon: '✉️' },
-  { id: 'received', label: 'Recebidos', icon: '📥' },
-  { id: 'sent', label: 'Enviados', icon: '📤' },
-  { id: 'insights', label: 'IA', icon: '✨' },
-]
+const SECTION_META: Record<Section, { title: string; subtitle: string }> = {
+  welcome: {
+    title: 'Início',
+    subtitle: 'Acompanhe seus retornos e compartilhe percepções sobre suas aulas.',
+  },
+  compose: {
+    title: 'Novo relato',
+    subtitle: 'Envie uma mensagem para suas matérias, docentes ou coordenação.',
+  },
+  received: {
+    title: 'Caixa de entrada',
+    subtitle: 'Mensagens e orientações enviadas pela equipe escolar para você.',
+  },
+  sent: {
+    title: 'Enviados',
+    subtitle: 'Histórico de relatos registrados pela sua conta.',
+  },
+  insights: {
+    title: 'Síntese com IA',
+    subtitle: 'Resumo consolidado dos retornos que você recebeu.',
+  },
+}
 
 export default function Aluno() {
   const { session, logout } = useAuth()
@@ -47,44 +60,69 @@ export default function Aluno() {
     void loadFeedbacks()
   }, [loadFeedbacks])
 
+  const navItems: Array<NavItem<Section>> = useMemo(
+    () => [
+      { id: 'welcome', label: 'Início', icon: Home },
+      { id: 'compose', label: 'Enviar relato', shortLabel: 'Enviar', icon: PenSquare },
+      {
+        id: 'received',
+        label: 'Recebidos',
+        icon: Inbox,
+        badge: feedbacks.received.length || undefined,
+      },
+      { id: 'sent', label: 'Enviados', icon: Send },
+      { id: 'insights', label: 'Síntese IA', shortLabel: 'Síntese', icon: Sparkles },
+    ],
+    [feedbacks.received.length],
+  )
+
   const renderSection = () => {
     switch (activeSection) {
       case 'welcome':
         return (
-          <PersonalWelcome
-            roleLabel={session?.fullName || 'Aluno'}
-            tips={[
-              'Envie feedbacks objetivos para professores e gestores.',
-              'Acompanhe o retorno das equipes escolares em “Recebidos”.',
-              'Use a seção de IA para gerar um resumo amigável quando houver novidades.',
-            ]}
-            actions={[
-              { label: 'Quero enviar algo', target: 'compose', description: 'Selecione o destinatário e escreva seu feedback.' },
-              { label: 'Ver o que me responderam', target: 'received', description: 'Filtre os retornos por sentimento.' },
-            ]}
-            onNavigate={setActiveSection}
-          />
+          <div className="space-y-5">
+            <PersonalWelcome
+              roleLabel={session?.fullName || 'Estudante'}
+              tips={[
+                'Seja específico ao comentar sobre aulas ou atividades.',
+                'Acompanhe respostas da coordenação e professores em Recebidos.',
+                'Seus relatos são protegidos com criptografia de ponta a ponta.',
+              ]}
+              actions={[
+                {
+                  label: 'Escrever novo relato',
+                  target: 'compose',
+                  description: 'Envie percepções sobre uma matéria, professor ou coordenação.',
+                },
+                {
+                  label: 'Consultar retornos recebidos',
+                  target: 'received',
+                  description: 'Veja orientações encaminhadas diretamente para você.',
+                },
+              ]}
+              onNavigate={setActiveSection}
+            />
+            <PersonalOverview stats={stats} notice={notice} loading={loading} />
+          </div>
         )
-      case 'overview':
-        return <PersonalOverview stats={stats} notice={notice} loading={loading} />
       case 'compose':
         return (
-          <section className="card p-6 space-y-4">
-            <FeedbackComposer
-              title="Enviar novo feedback"
-              helperText="Selecione o destinatário autorizado e compartilhe sua percepção."
-              onSuccess={loadFeedbacks}
-            />
-          </section>
+          <FeedbackComposer
+            title="Compartilhar percepção"
+            helperText="Escolha a matéria ou profissional correspondente e descreva sua observação."
+            onSuccess={() => {
+              void loadFeedbacks()
+            }}
+          />
         )
       case 'received':
         return (
           <FeedbackListSection
-            title="Feedbacks recebidos"
+            title="Mensagens recebidas"
             items={filteredReceived}
             loading={loading}
             infoMessage={notice}
-            emptyMessage="Nenhum feedback recebido ainda."
+            emptyMessage="Você ainda não recebeu retornos da equipe escolar."
             badgeLabel="Recebido"
             allowFilter
             filter={filter}
@@ -96,16 +134,16 @@ export default function Aluno() {
       case 'sent':
         return (
           <FeedbackListSection
-            title="Feedbacks enviados"
+            title="Relatos enviados"
             items={visibleSent}
             loading={loading}
             infoMessage={notice}
-            emptyMessage="Você ainda não enviou feedbacks."
+            emptyMessage="Você ainda não enviou nenhum relato."
             badgeLabel="Enviado"
             hideClassification
             onRefresh={loadFeedbacks}
             onDeleteItem={hideSentFeedback}
-            deleteLabel="Ocultar"
+            deleteLabel="Ocultar da lista"
             actionStatus={actionStatus}
             showTriggerBadge={false}
           />
@@ -124,23 +162,24 @@ export default function Aluno() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Header current="aluno" onLogout={logout} />
-      <main className="max-w-4xl mx-auto px-4 py-8 grid gap-6">
-        <PersonalHero
-          name={session?.fullName || 'Aluno'}
-          roleLabel="Aluno"
-          sections={SECTIONS}
-          activeSection={activeSection}
-          onChange={setActiveSection}
-          onRefresh={loadFeedbacks}
-          refreshLoading={loading}
-          refreshLabel="Atualizar dados"
-        />
+  const currentMeta = SECTION_META[activeSection]
 
-        {renderSection()}
-      </main>
-    </div>
+  return (
+    <AppShell
+      userName={session?.fullName || 'Estudante'}
+      userEmail={session?.email}
+      roleLabel="Aluno"
+      pageTitle={currentMeta.title}
+      pageSubtitle={currentMeta.subtitle}
+      items={navItems}
+      bottomNavIds={['welcome', 'compose', 'received', 'sent', 'insights']}
+      activeId={activeSection}
+      onSelect={setActiveSection}
+      onLogout={logout}
+      onRefresh={loadFeedbacks}
+      refreshLoading={loading}
+    >
+      {renderSection()}
+    </AppShell>
   )
 }

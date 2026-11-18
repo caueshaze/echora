@@ -110,6 +110,7 @@ def create_feedback(
         )
 
     sentiment_label, sentiment_score = analyze_sentiment(payload.content)
+    effective_anonymous = bool(payload.is_anonymous and current_user.role == "aluno")
     feedback = Feedback(
         sender_id=current_user.id,
         target_type=payload.target_type,
@@ -117,6 +118,7 @@ def create_feedback(
         content_encrypted=cipher_text,
         nonce=nonce,
         has_trigger=bool(triggers),
+        is_anonymous=effective_anonymous,
         sentiment=sentiment_label,
         sentiment_label=sentiment_label,
         sentiment_score=sentiment_score,
@@ -164,24 +166,30 @@ def list_my_feedbacks(
             Feedback.target_id == str(current_user.id),
         )
     ]
-    if subject_ids:
-        received_conditions.append(
-            and_(
-                Feedback.target_type == "subject",
-                Feedback.target_id.in_([str(subject_id) for subject_id in subject_ids]),
+    if current_user.role != "aluno":
+        if subject_ids:
+            received_conditions.append(
+                and_(
+                    Feedback.target_type == "subject",
+                    Feedback.target_id.in_([str(subject_id) for subject_id in subject_ids]),
+                )
             )
-        )
-    if classroom_ids:
-        received_conditions.append(
-            and_(
-                Feedback.target_type == "class",
-                Feedback.target_id.in_([str(classroom_id) for classroom_id in classroom_ids]),
+        if classroom_ids:
+            received_conditions.append(
+                and_(
+                    Feedback.target_type == "class",
+                    Feedback.target_id.in_([str(classroom_id) for classroom_id in classroom_ids]),
+                )
             )
-        )
     received_query = (
         select(Feedback)
         .options(joinedload(Feedback.sender), joinedload(Feedback.target))
-        .where(or_(*received_conditions))
+        .where(
+            and_(
+                Feedback.sender_id != current_user.id,
+                or_(*received_conditions),
+            )
+        )
         .order_by(Feedback.created_at.desc())
     )
 
@@ -238,17 +246,23 @@ def list_available_subjects(
 @router.get(
     "/available/classrooms",
     response_model=List[ClassroomPublic],
-    summary="Lista turmas elegíveis para envio de feedback",
+    summary="Lista turmas elegíveis para envio de feedback ou filtro de alunos",
 )
 def list_available_classrooms(
     current_user: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_session),
+    for_user_lookup: bool = Query(
+        default=False,
+        description="Quando verdadeiro, lista todas as turmas da unidade escolar para filtrar destinatários.",
+    ),
 ) -> List[ClassroomPublic]:
     db_user = _load_current_user_profile(db, current_user.id)
     classroom_ids = _visible_classroom_ids(current_user, db_user, db)
     if current_user.role == "admin":
         query = select(Classroom).order_by(Classroom.name)
-    elif current_user.role == "gestor":
+    elif current_user.role == "gestor" or (
+        for_user_lookup and current_user.role == "professor"
+    ):
         if not current_user.school_id:
             return []
         query = (

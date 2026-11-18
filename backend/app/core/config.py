@@ -94,7 +94,7 @@ class Settings(BaseSettings):
 
     # ===== MODELO DE SENTIMENTO (ONNX LOCAL) =====
     sentiment_model_path: str = Field(
-        default="/home/caue/Projeto/Echora/models/model.onnx",
+        default="models/model.onnx",
         env="SENTIMENT_MODEL_PATH",
     )
 
@@ -108,25 +108,37 @@ class Settings(BaseSettings):
         env="SENTIMENT_API_KEY",
     )
 
-    # ===== LLM CONFIG (GEMMA LOCAL + GEMMA REMOTA) =====
-    # Provedor ativo para sumarização / LLM (se/quando você usar)
-    # Exemplos: "none", "gemma-local", "gemma-http"
-    llm_provider: str = Field(
-        default="none",
-        env="LLM_PROVIDER",
+    # ===== LLM / SUMÁRIO COM IA =====
+    summary_provider: str = Field(
+        default="openai",
+        env="SUMMARY_PROVIDER",
+    )
+    summary_model: str = Field(
+        default="gpt-5-nano",
+        env="SUMMARY_MODEL",
+    )
+    openai_api_key: str = Field(
+        default="",
+        env="OPENAI_API_KEY",
+    )
+    openai_api_base: str = Field(
+        default="https://api.openai.com/v1",
+        env="OPENAI_API_BASE",
     )
 
-    # Gemma local (rodando na máquina / servidor)
+    # Configurações legadas (compatibilidade)
+    llm_provider: str = Field(
+        default="openai",
+        env="LLM_PROVIDER",
+    )
     gemma_model_dir: str = Field(
-        default="/home/caue/Projeto/Echora/models/gemma-2b-it",
+        default="models/gemma-2b-it",
         env="GEMMA_MODEL_DIR",
     )
     gemma_enabled: bool = Field(
         default=False,
         env="GEMMA_ENABLED",
     )
-
-    # Gemma via API HTTP (tipo gateway, se você criar depois)
     gemma_api_url: str = Field(
         default="",
         env="GEMMA_API_URL",

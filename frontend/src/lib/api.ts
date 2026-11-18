@@ -127,7 +127,14 @@ export function createFeedback(payload: FeedbackCreateInput) {
 }
 
 export function fetchUsers(
-  params: { offset?: number; limit?: number; role?: AdminRole } = {},
+  params: {
+    offset?: number
+    limit?: number
+    role?: AdminRole
+    classroom_id?: number
+    school_id?: number
+    search?: string
+  } = {},
 ) {
   const ROLE_QUERY_MAP: Record<AdminRole, string> = {
     admin: 'admin',
@@ -143,21 +150,34 @@ export function fetchUsers(
     const apiRole = ROLE_QUERY_MAP[params.role] ?? params.role
     search.set('role', apiRole)
   }
+  if (params.classroom_id !== undefined) {
+    search.set('classroom_id', String(params.classroom_id))
+  }
+  if (params.school_id !== undefined) {
+    search.set('school_id', String(params.school_id))
+  }
+  if (params.search && params.search.trim()) {
+    search.set('search', params.search.trim())
+  }
   const query = search.toString()
   const path = `/api/v1/admin/users${query ? `?${query}` : ''}`
   return authFetch<DirectoryUser[]>(path)
 }
 
-export function fetchUsersByRole(role: AdminRole) {
-  return fetchUsers({ role, limit: 200 })
+export function fetchUsersByRole(
+  role: AdminRole,
+  options: { classroom_id?: number; school_id?: number; search?: string } = {},
+) {
+  return fetchUsers({ role, limit: 500, ...options })
 }
 
 export function fetchAvailableSubjects() {
   return authFetch<Subject[]>('/api/v1/feedback/available/subjects')
 }
 
-export function fetchAvailableClassrooms() {
-  return authFetch<Classroom[]>('/api/v1/feedback/available/classrooms')
+export function fetchAvailableClassrooms(options: { forUserLookup?: boolean } = {}) {
+  const query = options.forUserLookup ? '?for_user_lookup=true' : ''
+  return authFetch<Classroom[]>(`/api/v1/feedback/available/classrooms${query}`)
 }
 
 export function createAdminUser(payload: AdminUserCreateInput) {

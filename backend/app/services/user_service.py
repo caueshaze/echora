@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..core.security import hash_password
@@ -215,6 +215,9 @@ def list_users(
     current_user: UserPublic,
     *,
     normalized_role: Optional[str],
+    classroom_id: Optional[int] = None,
+    school_id: Optional[int] = None,
+    search: Optional[str] = None,
     offset: int,
     limit: int,
 ) -> list[User]:
@@ -246,10 +249,25 @@ def list_users(
                 detail="Seu perfil não está vinculado a uma unidade escolar",
             )
         query = query.where(User.school_id == current_user.school_id)
+    elif current_user.role == "admin" and school_id is not None:
+        query = query.where(User.school_id == school_id)
 
     if normalized_role:
         query = query.where(User.role == normalized_role)
-    query = query.offset(offset).limit(limit)
+
+    if classroom_id is not None:
+        query = query.where(User.classroom_id == classroom_id)
+
+    if search and search.strip():
+        pattern = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                User.full_name.ilike(pattern),
+                User.email.ilike(pattern),
+            )
+        )
+
+    query = query.order_by(User.full_name.asc()).offset(offset).limit(limit)
     return db.execute(query).scalars().all()
 
 

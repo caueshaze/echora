@@ -16,9 +16,12 @@ Funções principais usadas pelas rotas:
 from __future__ import annotations
 
 import logging
+import os
 import re
 from time import perf_counter
 from typing import Iterable, Sequence, List, Optional
+
+import httpx
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -223,13 +226,71 @@ def measure_llm_latency(prompt_text: str = "Gere um breve resumo positivo.", max
     return (perf_counter() - start) * 1000
 
 # ==========================================================
-# Execução do Gemma
+# Execução do Modelo de Linguagem (OpenAI / Gemma)
 # ==========================================================
+def _run_openai(prompt_text: str, max_new_tokens: int = 500) -> str:
+    """Executa a geração do resumo via API da OpenAI ou compatível."""
+    settings = get_settings()
+    api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "").strip()
+
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY não configurada. Defina OPENAI_API_KEY no arquivo .env."
+        )
+
+    base_url = (settings.openai_api_base or "https://api.openai.com/v1").rstrip("/")
+    endpoint = f"{base_url}/chat/completions"
+    model = settings.summary_model or "gpt-5-nano"
+
+    LOGGER.info("Enviando solicitação de resumo à OpenAI (modelo: %s, endpoint: %s)", model, endpoint)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Você é Maya, uma mentora empática, acolhedora e otimista da plataforma educacional Echora. "
+                    "Sua missão é sintetizar os feedbacks escolares de forma construtiva, amigável e direta em português do Brasil."
+                ),
+            },
+            {"role": "user", "content": prompt_text},
+        ],
+        "temperature": 0.7,
+    }
+
+    try:
+        with httpx.Client(timeout=45.0) as client:
+            resp = client.post(endpoint, headers=headers, json=payload)
+            if resp.status_code != 200:
+                LOGGER.error("Erro na resposta da OpenAI (%s): %s", resp.status_code, resp.text)
+                raise RuntimeError(f"Erro na API da OpenAI ({resp.status_code}): {resp.text}")
+            data = resp.json()
+            raw_text = data["choices"][0]["message"]["content"].strip()
+            return _post_process_summary(raw_text)
+    except httpx.HTTPError as exc:
+        LOGGER.exception("Falha de conexão com a OpenAI: %s", exc)
+        raise RuntimeError(f"Falha de conexão com a OpenAI: {exc}") from exc
+
+
 def _run_llm(prompt_text: str, max_new_tokens: int = 260) -> str:
     """
-    Executa o Gemma para gerar a mensagem de feedback.
-    Espera `prompt_text` já formatado; sem fallback heurístico.
+    Executa o LLM configurado (OpenAI ou Gemma local) para gerar a mensagem de feedback.
     """
+    settings = get_settings()
+    provider = (
+        getattr(settings, "summary_provider", None)
+        or getattr(settings, "llm_provider", None)
+        or "openai"
+    ).lower()
+
+    if provider in ("openai", "chatgpt"):
+        return _run_openai(prompt_text, max_new_tokens=max_new_tokens)
+
     _ensure_gemma()
     assert _LLM_MODEL is not None
     assert _LLM_TOKENIZER is not None

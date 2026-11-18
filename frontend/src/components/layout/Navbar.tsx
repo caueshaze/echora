@@ -1,11 +1,14 @@
 import { MouseEvent, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowRight, Menu, X } from 'lucide-react'
+
+import { EchoraLogo } from '../brand/EchoraLogo'
 
 const navItems = [
-  { label: 'Início', target: 'inicio' },
   { label: 'Como funciona', target: 'como-funciona' },
-  { label: 'Recursos', target: 'recursos' },
-  { label: 'FAQ', target: 'faq' },
+  { label: 'Para cada perfil', target: 'perfis' },
+  { label: 'Segurança', target: 'seguranca' },
+  { label: 'Dúvidas', target: 'faq' },
   { label: 'Contato', target: 'contato' },
 ]
 
@@ -37,63 +40,64 @@ export function Navbar() {
   }
 
   return (
-    <header
-      className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100"
-      id="top"
-    >
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 font-semibold text-slate-900">
-          <span className="h-10 w-10 rounded-xl bg-slate-900 text-white grid place-items-center text-lg font-bold">
-            IC
-          </span>
-          <span>Echora</span>
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200/80" id="top">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center" onClick={() => setOpen(false)}>
+          <EchoraLogo size="md" />
         </Link>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
+
+        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
           {navItems.map((item) => (
             <a
               key={item.target}
               href={`#${item.target}`}
-              className="hover:text-slate-900"
+              className="hover:text-slate-900 transition-colors"
               onClick={(event) => handleNavClick(event, item.target)}
             >
               {item.label}
             </a>
           ))}
-          <Link
-            to="/login"
-            className="rounded-full px-4 py-2 bg-slate-900 text-white font-medium hover:bg-slate-800"
-          >
-            Entrar
-          </Link>
         </nav>
+
+        <div className="hidden md:flex items-center gap-3">
+          <Link to="/login" className="btn py-2 min-h-[38px] px-4">
+            Entrar
+            <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+          </Link>
+        </div>
+
         <button
-          className="md:hidden p-2 rounded-lg border border-slate-200 text-slate-600"
+          type="button"
+          className="md:hidden p-2 -mr-2 rounded-lg text-slate-600 hover:bg-slate-100"
           onClick={() => setOpen((prev) => !prev)}
           aria-label={open ? 'Fechar menu' : 'Abrir menu'}
         >
-          <span className="block w-5 h-[2px] bg-current mb-1" />
-          <span className="block w-5 h-[2px] bg-current mb-1" />
-          <span className="block w-5 h-[2px] bg-current" />
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
+
       {open && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-4 text-sm text-slate-600">
-          <div className="flex flex-col gap-3 py-4">
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-2 shadow-elevated">
+          <nav className="flex flex-col divide-y divide-slate-100 text-sm font-medium text-slate-700">
             {navItems.map((item) => (
               <a
                 key={item.target}
                 href={`#${item.target}`}
+                className="py-3 hover:text-brand-700"
                 onClick={(event) => handleNavClick(event, item.target)}
               >
                 {item.label}
               </a>
             ))}
+          </nav>
+          <div className="pt-4">
             <Link
               to="/login"
-              className="rounded-full px-4 py-2 bg-slate-900 text-white text-center font-medium hover:bg-slate-800"
+              className="btn w-full"
               onClick={() => setOpen(false)}
             >
-              Entrar
+              Acessar minha conta
+              <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
             </Link>
           </div>
         </div>

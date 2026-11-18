@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react'
+import { UserPlus } from 'lucide-react'
 
 import type { AdminRole, Classroom, School, Subject } from '../../lib/types'
 import type { UserFormState } from '../../hooks/useGestorDirectory'
@@ -36,7 +37,6 @@ export function UserRegistrationCard({
   classrooms,
   mode,
   onCancelEdit,
-  tone = 'light',
   className,
   allowedRoles,
   disabled = false,
@@ -47,20 +47,11 @@ export function UserRegistrationCard({
     onChange({ [id as keyof UserFormState]: value } as Partial<UserFormState>)
   }
 
-  const isDark = tone === 'dark'
-  const containerClass =
-    className ??
-    (isDark
-      ? 'rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4 text-slate-100'
-      : 'card p-6 space-y-4')
-  const inputClass = isDark
-    ? 'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-slate-400 focus:border-white/40 focus:outline-none'
-    : 'input'
-  const labelClass = isDark ? 'text-xs uppercase tracking-wide text-slate-300' : 'label'
-  const helperTextClass = isDark ? 'text-xs text-slate-400' : 'text-xs text-slate-500'
   const roleOptions: AdminRole[] =
     allowedRoles ||
-    (isManager ? (['professor', 'aluno'] as AdminRole[]) : (['admin', 'gestor', 'professor', 'aluno'] as AdminRole[]))
+    (isManager
+      ? (['professor', 'aluno'] as AdminRole[])
+      : (['admin', 'gestor', 'professor', 'aluno'] as AdminRole[]))
   const formDisabled = submitting || disabled
 
   const filteredSubjects = subjects.filter(
@@ -71,91 +62,91 @@ export function UserRegistrationCard({
   )
 
   return (
-    <div className={containerClass}>
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <div className={className ?? 'card p-5 sm:p-6 space-y-5'}>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            {mode === 'edit' ? 'Editar usuário' : 'Cadastro de usuários'}
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+            {mode === 'edit' ? 'Editar cadastro' : 'Novo usuário'}
           </h3>
-          <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <p className="text-sm text-slate-500">
             {mode === 'edit'
-              ? 'Atualize os dados necessários e salve para aplicar as alterações.'
-              : isAdmin
-                ? 'Integração direta com `/api/v1/admin/users`.'
-                : 'Cadastre usuários autorizados e defina seus vínculos oficiais.'}
+              ? 'Altere os dados ou vínculos escolares e salve.'
+              : 'Preencha as informações institucionais para liberar o acesso.'}
           </p>
         </div>
         {mode === 'edit' && (
           <button
             type="button"
-            className="text-sm text-slate-500 underline-offset-4 hover:underline"
+            className="btn-secondary text-xs py-1.5 px-3 min-h-[34px]"
             onClick={onCancelEdit}
           >
-            Cancelar edição
+            Cancelar
           </button>
         )}
       </div>
 
       {disabledReason && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
           {disabledReason}
         </div>
       )}
 
-      <form className="space-y-6" onSubmit={onSubmit}>
-        <fieldset className="grid gap-4 md:grid-cols-2">
-          <legend className={`col-span-full text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
-            Dados básicos
-          </legend>
-          <div className="space-y-2">
-            <label className={labelClass} htmlFor="full_name">Nome completo</label>
+      <form className="space-y-5" onSubmit={onSubmit}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="full_name">
+              Nome completo
+            </label>
             <input
               id="full_name"
-              className={inputClass}
+              className="input"
+              placeholder="Ex.: Mariana Souza"
               value={form.full_name}
               onChange={handleInputChange}
               disabled={formDisabled}
               required
             />
           </div>
-          <div className="space-y-2">
-            <label className={labelClass} htmlFor="email">E-mail institucional</label>
+
+          <div>
+            <label className="label" htmlFor="email">
+              E-mail institucional
+            </label>
             <input
               id="email"
               type="email"
-              className={inputClass}
+              className="input"
+              placeholder="nome@escola.edu.br"
               value={form.email}
               onChange={handleInputChange}
               disabled={formDisabled}
               required
             />
           </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className={labelClass} htmlFor="password">Senha temporária</label>
+
+          <div>
+            <label className="label" htmlFor="password">
+              {mode === 'edit' ? 'Nova senha (opcional)' : 'Senha inicial'}
+            </label>
             <input
               id="password"
               type="password"
-              className={inputClass}
+              className="input"
+              placeholder={mode === 'edit' ? 'Manter senha atual' : 'Mínimo de 6 caracteres'}
               value={form.password}
               onChange={handleInputChange}
               disabled={formDisabled}
               required={mode === 'create'}
             />
-            {mode === 'edit' && (
-              <p className={helperTextClass}>Deixe em branco para manter a senha atual.</p>
-            )}
           </div>
-        </fieldset>
 
-        <fieldset className="grid gap-4 md:grid-cols-2">
-          <legend className={`col-span-full text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
-            Perfis e vínculos
-          </legend>
-          <div className="space-y-2">
-            <label className={labelClass} htmlFor="role">Perfil</label>
+          <div>
+            <label className="label" htmlFor="role">
+              Função na escola
+            </label>
             <select
               id="role"
-              className={inputClass}
+              className="input"
               value={form.role}
               onChange={(event) =>
                 onChange({
@@ -174,21 +165,28 @@ export function UserRegistrationCard({
               ))}
             </select>
           </div>
+
           {form.role !== 'admin' && (
-            <div className="space-y-2">
-              <label className={labelClass} htmlFor="school_id">Unidade escolar</label>
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="school_id">
+                Unidade escolar
+              </label>
               {isAdmin ? (
                 <select
                   id="school_id"
-                  className={inputClass}
+                  className="input"
                   value={form.school_id}
                   onChange={(event) =>
-                    onChange({ school_id: event.target.value, classroom_id: '', teachable_subject_ids: [] })
+                    onChange({
+                      school_id: event.target.value,
+                      classroom_id: '',
+                      teachable_subject_ids: [],
+                    })
                   }
                   disabled={formDisabled}
                   required
                 >
-                  <option value="">Selecione...</option>
+                  <option value="">Selecione a unidade...</option>
                   {visibleSchools.map((school) => (
                     <option key={school.id} value={school.id}>
                       {school.name}
@@ -196,28 +194,28 @@ export function UserRegistrationCard({
                   ))}
                 </select>
               ) : (
-                <div
-                  className={`flex items-center rounded-2xl border px-4 py-2 ${
-                    isDark ? 'border-white/10 bg-white/10 text-slate-300' : 'input bg-slate-50 text-slate-600'
-                  }`}
-                >
-                  <span>{visibleSchools[0]?.name || 'Unidade não definida'}</span>
+                <div className="input flex items-center bg-slate-50 text-slate-600">
+                  <span>{visibleSchools[0]?.name || 'Unidade vinculada'}</span>
                 </div>
               )}
             </div>
           )}
 
           {form.role === 'professor' && (
-            <div className="space-y-2 md:col-span-2">
-              <label className={labelClass} htmlFor="teachable_subject_ids">Matérias habilitadas</label>
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="teachable_subject_ids">
+                Matérias lecionadas
+              </label>
               <select
                 id="teachable_subject_ids"
                 multiple
-                className={`${inputClass} h-32`}
+                className="input h-32"
                 value={form.teachable_subject_ids}
                 onChange={(event) =>
                   onChange({
-                    teachable_subject_ids: Array.from(event.target.selectedOptions).map((option) => option.value),
+                    teachable_subject_ids: Array.from(event.target.selectedOptions).map(
+                      (option) => option.value,
+                    ),
                   })
                 }
                 disabled={formDisabled || !form.school_id}
@@ -229,61 +227,62 @@ export function UserRegistrationCard({
                   </option>
                 ))}
               </select>
-              <p className={helperTextClass}>
+              <p className="text-xs text-slate-500 mt-1">
                 {form.school_id
                   ? filteredSubjects.length
-                    ? 'Use Ctrl/Cmd para selecionar várias matérias que este professor pode lecionar.'
-                    : 'Cadastre matérias em "Estrutura Escolar → Matérias" para habilitar esta opção.'
-                  : 'Escolha a unidade antes de selecionar as matérias.'}
+                    ? 'No computador, segure Ctrl (ou Cmd) para marcar mais de uma matéria.'
+                    : 'Cadastre matérias antes de vincular professores.'
+                  : 'Selecione primeiro a unidade escolar.'}
               </p>
             </div>
           )}
 
           {form.role === 'aluno' && (
-            <div className="space-y-2 md:col-span-2">
-              <label className={labelClass} htmlFor="classroom_id">Turma</label>
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="classroom_id">
+                Turma
+              </label>
               <select
                 id="classroom_id"
-                className={inputClass}
+                className="input"
                 value={form.classroom_id}
                 onChange={(event) => onChange({ classroom_id: event.target.value })}
                 disabled={formDisabled || !form.school_id}
                 required
               >
-                <option value="">Selecione...</option>
+                <option value="">Selecione a turma...</option>
                 {filteredClassrooms.map((classroom) => (
                   <option key={classroom.id} value={String(classroom.id)}>
                     {classroom.name}
                   </option>
                 ))}
               </select>
-              <p className={helperTextClass}>
-                {form.school_id
-                  ? filteredClassrooms.length
-                    ? 'Todo aluno precisa estar vinculado a exatamente uma turma.'
-                    : 'Cadastre turmas em "Estrutura Escolar → Turmas" antes de adicionar alunos.'
-                  : 'Escolha a unidade para liberar a lista de turmas.'}
-              </p>
+              {!form.school_id && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Selecione primeiro a unidade escolar para listar as turmas.
+                </p>
+              )}
             </div>
           )}
-        </fieldset>
+        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
           <p className="text-sm text-slate-600">{statusMessage}</p>
-          <div className="flex gap-3">
-            <button className="btn" type="submit" disabled={formDisabled}>
-              {submitting ? 'Salvando...' : mode === 'edit' ? 'Atualizar usuário' : 'Cadastrar usuário'}
-            </button>
+          <div className="flex gap-2">
             {mode === 'edit' && (
               <button
                 type="button"
-                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="btn-secondary"
                 onClick={onCancelEdit}
                 disabled={submitting}
               >
                 Cancelar
               </button>
             )}
+            <button className="btn w-full sm:w-auto" type="submit" disabled={formDisabled}>
+              <UserPlus className="h-4 w-4" strokeWidth={1.75} />
+              {submitting ? 'Salvando...' : mode === 'edit' ? 'Salvar alterações' : 'Cadastrar'}
+            </button>
           </div>
         </div>
       </form>
@@ -294,7 +293,7 @@ export function UserRegistrationCard({
 function labelForRole(role: AdminRole) {
   return {
     admin: 'Administrador',
-    gestor: 'Gestor(a)',
+    gestor: 'Gestor(a) / Coordenação',
     professor: 'Professor(a)',
     aluno: 'Aluno(a)',
   }[role]

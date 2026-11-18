@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import { OverviewMetricsGrid } from './OverviewMetricsGrid'
 
 type GestorOverviewSectionProps = {
@@ -14,14 +15,24 @@ export function GestorOverviewSection({
   onRefresh,
 }: GestorOverviewSectionProps) {
   return (
-    <section className="card p-6 space-y-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <section className="card p-5 sm:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold">Indicadores rápidos</h3>
-          <p className="text-sm text-slate-600">Visão geral dos feedbacks monitorados.</p>
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+            Clima da unidade escolar
+          </h2>
+          <p className="text-sm text-slate-500">
+            Consolidado dos relatos registrados recentemente.
+          </p>
         </div>
-        <button className="btn" onClick={onRefresh} disabled={loading}>
-          {loading ? 'Atualizando...' : 'Atualizar lista'}
+        <button
+          type="button"
+          className="btn-secondary text-xs py-2 min-h-[36px] shrink-0"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{loading ? 'Atualizando...' : 'Atualizar'}</span>
         </button>
       </div>
       {notice && <p className="text-sm text-slate-500">{notice}</p>}

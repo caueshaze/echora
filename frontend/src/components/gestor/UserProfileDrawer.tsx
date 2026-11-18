@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { FeedbackCard } from '../feedback/FeedbackCard'
 import type { FeedbackPublic } from '../../lib/types'
 import type { UserAggregate } from '../../hooks/useGestorOverview'
@@ -27,57 +28,66 @@ export function UserProfileDrawer({
   const roleLabel = profile.role ? ROLE_LABELS[profile.role] || profile.role : 'Usuário'
 
   return (
-    <div className="fixed inset-0 z-40 flex">
-      <button type="button" className="flex-1 bg-slate-900/30" onClick={onClose} aria-label="Fechar painel" />
-      <div className="w-full max-w-md bg-white shadow-2xl h-full overflow-y-auto p-6 space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-rose-600 font-semibold">Perfil monitorado</p>
-            <h3 className="text-2xl font-semibold text-slate-900">{profile.name}</h3>
-            <p className="text-sm text-slate-600">
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Fechar histórico do usuário"
+      />
+      <div className="relative z-10 w-full max-w-md bg-white shadow-elevated h-full overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="min-w-0">
+            <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-800 mb-1">
               {roleLabel}
-              {profile.email ? ` • ${profile.email}` : ''}
-            </p>
+            </span>
+            <h3 className="text-xl font-bold text-slate-900 truncate">{profile.name}</h3>
+            {profile.email && <p className="text-xs text-slate-500 truncate">{profile.email}</p>}
           </div>
           <button
             type="button"
-            className="text-sm text-slate-500 hover:text-slate-900"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
             onClick={onClose}
+            aria-label="Fechar"
           >
-            Fechar ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-2xl border border-slate-200 p-3">
-            <p className="text-2xl font-semibold text-slate-900">{profile.sent}</p>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Enviados</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+            <p className="text-xs text-slate-500">Enviados</p>
+            <p className="text-xl font-bold text-slate-900 tabular-nums">{profile.sent}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 p-3">
-            <p className="text-2xl font-semibold text-slate-900">{profile.received}</p>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Recebidos</p>
+          <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
+            <p className="text-xs text-slate-500">Recebidos</p>
+            <p className="text-xl font-bold text-slate-900 tabular-nums">{profile.received}</p>
           </div>
-          <div className="rounded-2xl border border-emerald-200 p-3">
-            <p className="text-2xl font-semibold text-emerald-600">{profile.positiveReceived}</p>
-            <p className="text-xs uppercase tracking-wide text-emerald-600">Elogios</p>
+          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-3">
+            <p className="text-xs text-emerald-700">Positivos</p>
+            <p className="text-xl font-bold text-emerald-800 tabular-nums">
+              {profile.positiveReceived}
+            </p>
           </div>
-          <div className="rounded-2xl border border-rose-200 p-3">
-            <p className="text-2xl font-semibold text-rose-600">{profile.negativeReceived}</p>
-            <p className="text-xs uppercase tracking-wide text-rose-600">Pressões</p>
+          <div className="rounded-lg border border-rose-200/80 bg-rose-50/40 p-3">
+            <p className="text-xs text-rose-700">Atenção</p>
+            <p className="text-xl font-bold text-rose-800 tabular-nums">
+              {profile.negativeReceived}
+            </p>
           </div>
         </div>
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-slate-900">Feedbacks enviados</h4>
-            <span className="text-xs text-slate-500">Mostrando até 5 mais recentes</span>
+            <h4 className="text-sm font-semibold text-slate-900">Últimos recebidos</h4>
+            <span className="text-xs text-slate-400">Até 5 registros</span>
           </div>
-          {sentFeedbacks.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum feedback enviado.</p>
+          {receivedFeedbacks.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhum relato recebido.</p>
           ) : (
-            <div className="space-y-3">
-              {sentFeedbacks.slice(0, 5).map((feedback) => (
-                <FeedbackCard key={feedback.id} feedback={feedback} badge="Enviado" />
+            <div className="space-y-2.5">
+              {receivedFeedbacks.slice(0, 5).map((feedback) => (
+                <FeedbackCard key={feedback.id} feedback={feedback} badge="Recebido" />
               ))}
             </div>
           )}
@@ -85,15 +95,15 @@ export function UserProfileDrawer({
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-slate-900">Feedbacks recebidos</h4>
-            <span className="text-xs text-slate-500">Mostrando até 5 mais recentes</span>
+            <h4 className="text-sm font-semibold text-slate-900">Últimos enviados</h4>
+            <span className="text-xs text-slate-400">Até 5 registros</span>
           </div>
-          {receivedFeedbacks.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum feedback recebido.</p>
+          {sentFeedbacks.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhum relato enviado.</p>
           ) : (
-            <div className="space-y-3">
-              {receivedFeedbacks.slice(0, 5).map((feedback) => (
-                <FeedbackCard key={feedback.id} feedback={feedback} badge="Recebido" />
+            <div className="space-y-2.5">
+              {sentFeedbacks.slice(0, 5).map((feedback) => (
+                <FeedbackCard key={feedback.id} feedback={feedback} badge="Enviado" />
               ))}
             </div>
           )}

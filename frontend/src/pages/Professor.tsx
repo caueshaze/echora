@@ -1,30 +1,58 @@
-// src/pages/Professor.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  BarChart3,
+  Home,
+  Inbox,
+  PenSquare,
+  Send,
+  ShieldAlert,
+  Sparkles,
+} from 'lucide-react'
 
-import Header from '../components/Header'
 import { FeedbackComposer } from '../components/feedback/FeedbackComposer'
-import { useAuth } from '../context/AuthContext'
-import { usePersonalFeedbacks } from '../hooks/usePersonalFeedbacks'
-import { PersonalHero } from '../components/personal/PersonalHero'
-import { PersonalOverview } from '../components/personal/PersonalOverview'
+import { AppShell, type NavItem } from '../components/layout/AppShell'
 import { FeedbackListSection } from '../components/personal/FeedbackListSection'
+import { PersonalOverview } from '../components/personal/PersonalOverview'
 import { PersonalSummaryCard } from '../components/personal/PersonalSummaryCard'
 import { PersonalWelcome } from '../components/personal/PersonalWelcome'
+import { useAuth } from '../context/AuthContext'
+import { usePersonalFeedbacks } from '../hooks/usePersonalFeedbacks'
 import { useTriggerAlerts } from '../hooks/useTriggerAlerts'
 import { reportFeedback } from '../lib/api'
 import type { FeedbackPublic } from '../lib/types'
 
-type Section = 'welcome' | 'overview' | 'compose' | 'received' | 'sent' | 'alerts' | 'insights'
+type Section = 'welcome' | 'received' | 'compose' | 'sent' | 'alerts' | 'insights' | 'overview'
 
-const SECTIONS: Array<{ id: Section; label: string; icon: string }> = [
-  { id: 'welcome', label: 'Início', icon: '👋' },
-  { id: 'overview', label: 'Resumo', icon: '📊' },
-  { id: 'compose', label: 'Comunicar', icon: '📝' },
-  { id: 'received', label: 'Recebidos', icon: '📥' },
-  { id: 'sent', label: 'Enviados', icon: '📤' },
-  { id: 'alerts', label: 'Alertas', icon: '🚨' },
-  { id: 'insights', label: 'IA', icon: '✨' },
-]
+const SECTION_META: Record<Section, { title: string; subtitle: string }> = {
+  welcome: {
+    title: 'Área Docente',
+    subtitle: 'Acompanhe a escuta das suas turmas e envie orientações.',
+  },
+  overview: {
+    title: 'Indicadores',
+    subtitle: 'Distribuição dos retornos recebidos nas suas disciplinas.',
+  },
+  compose: {
+    title: 'Enviar orientação',
+    subtitle: 'Encaminhe comunicados ou feedbacks para alunos, turmas ou gestão.',
+  },
+  received: {
+    title: 'Retornos das turmas',
+    subtitle: 'Percepções enviadas pelos estudantes nas suas matérias.',
+  },
+  sent: {
+    title: 'Enviados',
+    subtitle: 'Histórico de mensagens encaminhadas por você.',
+  },
+  alerts: {
+    title: 'Pontos de atenção',
+    subtitle: 'Relatos sinalizados preventivamente para acompanhamento.',
+  },
+  insights: {
+    title: 'Síntese com IA',
+    subtitle: 'Leitura consolidada dos principais pontos citados pelas turmas.',
+  },
+}
 
 export default function Professor() {
   const { session, logout } = useAuth()
@@ -53,27 +81,52 @@ export default function Professor() {
     void loadFeedbacks()
   }, [loadFeedbacks])
 
+  const navItems: Array<NavItem<Section>> = useMemo(
+    () => [
+      { id: 'welcome', label: 'Início', icon: Home, group: 'Acompanhamento' },
+      {
+        id: 'received',
+        label: 'Recebidos',
+        icon: Inbox,
+        group: 'Acompanhamento',
+        badge: feedbacks.received.length || undefined,
+      },
+      { id: 'compose', label: 'Comunicar', icon: PenSquare, group: 'Acompanhamento' },
+      { id: 'sent', label: 'Enviados', icon: Send, group: 'Acompanhamento' },
+      { id: 'overview', label: 'Indicadores', icon: BarChart3, group: 'Análise' },
+      {
+        id: 'alerts',
+        label: 'Atenção',
+        icon: ShieldAlert,
+        group: 'Análise',
+        badge: triggerAlerts.alerts.length || undefined,
+      },
+      { id: 'insights', label: 'Síntese IA', shortLabel: 'Síntese', icon: Sparkles, group: 'Análise' },
+    ],
+    [feedbacks.received.length, triggerAlerts.alerts.length],
+  )
+
   const handleReportFeedback = async (feedback: FeedbackPublic) => {
     if (feedback.has_trigger) {
-      setReportStatus('Este feedback já está em análise.')
+      setReportStatus('Este relato já está sinalizado para análise da gestão.')
       return
     }
-    const reason = window.prompt('Descreva rapidamente o motivo do alerta:')
+    const reason = window.prompt('Informe brevemente o motivo para encaminhar à coordenação:')
     if (reason === null) {
       return
     }
     const trimmed = reason.trim()
     if (trimmed.length < 5) {
-      setReportStatus('Explique o motivo em pelo menos 5 caracteres.')
+      setReportStatus('Descreva o motivo com pelo menos 5 caracteres.')
       return
     }
-    setReportStatus('Enviando alerta para a gestão...')
+    setReportStatus('Encaminhando para a coordenação...')
     try {
       await reportFeedback(feedback.id, { reason: trimmed })
-      setReportStatus('Alerta registrado e enviado para a gestão.')
+      setReportStatus('Relato encaminhado para acompanhamento da gestão.')
       await Promise.all([loadFeedbacks(), triggerAlerts.loadAlerts()])
     } catch (error: any) {
-      setReportStatus(error?.message || 'Não foi possível reportar este feedback.')
+      setReportStatus(error?.message || 'Não foi possível sinalizar este relato.')
     }
   }
 
@@ -81,58 +134,69 @@ export default function Professor() {
     switch (activeSection) {
       case 'welcome':
         return (
-          <PersonalWelcome
-            roleLabel={session?.fullName || 'Professor(a)'}
-            tips={[
-              'Acompanhe os retornos das suas turmas em “Recebidos”.',
-              'Use “Comunicar” para enviar orientações rápidas para a rede.',
-              'Gere insights com IA quando quiser um panorama resumido.',
-            ]}
-            actions={[
-              { label: 'Ver retornos das turmas', target: 'received', description: 'Filtre por sentimento para priorizar.' },
-              { label: 'Enviar comunicados', target: 'compose', description: 'Compartilhe orientações com alunos ou gestores.' },
-            ]}
-            onNavigate={setActiveSection}
-          />
+          <div className="space-y-5">
+            <PersonalWelcome
+              roleLabel={session?.fullName || 'Professor(a)'}
+              tips={[
+                'Consulte os retornos filtrando por clima positivo, neutro ou atenção.',
+                'Caso identifique um relato sensível, encaminhe à coordenação em um clique.',
+                'Use a Síntese com IA para identificar padrões das turmas rapidamente.',
+              ]}
+              actions={[
+                {
+                  label: 'Ler retornos das turmas',
+                  target: 'received',
+                  description: 'Veja as percepções mais recentes sobre suas aulas e disciplinas.',
+                },
+                {
+                  label: 'Enviar orientação ou retorno',
+                  target: 'compose',
+                  description: 'Comunique-se diretamente com estudantes, turmas ou gestão.',
+                },
+              ]}
+              onNavigate={setActiveSection}
+            />
+            <PersonalOverview stats={stats} notice={notice} loading={loading} />
+          </div>
         )
       case 'overview':
         return <PersonalOverview stats={stats} notice={notice} loading={loading} />
       case 'compose':
         return (
-          <section className="card p-6 space-y-4">
-            <FeedbackComposer
-              title="Enviar comunicação"
-              helperText="Encaminhe orientações para alunos, gestores ou outros professores."
-              onSuccess={loadFeedbacks}
-            />
-          </section>
+          <FeedbackComposer
+            title="Nova comunicação"
+            helperText="Envie orientações pedagógicas para alunos, turmas ou equipe gestora."
+            onSuccess={() => {
+              void loadFeedbacks()
+            }}
+          />
         )
       case 'received':
         return (
           <FeedbackListSection
-            title="Retornos das turmas"
+            title="Retornos recebidos"
             items={filteredReceived}
             loading={loading}
             infoMessage={notice}
-            emptyMessage="Nenhum feedback recebido ainda."
-            badgeLabel="Recebido"
+            emptyMessage="Nenhum relato recebido nas suas turmas até o momento."
+            badgeLabel="Turma"
             allowFilter
             filter={filter}
             onFilterChange={setFilter}
             onRefresh={loadFeedbacks}
             onSecondaryAction={handleReportFeedback}
-            secondaryActionLabel="Reportar alerta"
+            secondaryActionLabel="Encaminhar à gestão"
             actionStatus={reportStatus}
           />
         )
       case 'sent':
         return (
           <FeedbackListSection
-            title="Comunicados enviados"
+            title="Comunicações enviadas"
             items={visibleSent}
             loading={loading}
             infoMessage={notice}
-            emptyMessage="Você ainda não enviou feedbacks."
+            emptyMessage="Você ainda não enviou comunicações."
             badgeLabel="Enviado"
             hideClassification
             onRefresh={loadFeedbacks}
@@ -144,12 +208,12 @@ export default function Professor() {
       case 'alerts':
         return (
           <FeedbackListSection
-            title="Alertas automáticos"
+            title="Relatos em atenção"
             items={triggerAlerts.alerts}
             loading={triggerAlerts.loading}
             infoMessage={triggerAlerts.notice}
-            emptyMessage="Nenhum alerta ativo no momento."
-            badgeLabel="Gatilho"
+            emptyMessage="Nenhum alerta ativo vinculado às suas turmas."
+            badgeLabel="Atenção"
             onRefresh={triggerAlerts.loadAlerts}
           />
         )
@@ -167,23 +231,24 @@ export default function Professor() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Header current="professor" onLogout={logout} />
-      <main className="max-w-4xl mx-auto px-4 py-8 grid gap-6">
-        <PersonalHero
-          name={session?.fullName || 'Professor(a)'}
-          roleLabel="Professor(a)"
-          sections={SECTIONS}
-          activeSection={activeSection}
-          onChange={setActiveSection}
-          onRefresh={loadFeedbacks}
-          refreshLoading={loading}
-          refreshLabel="Atualizar dados"
-        />
+  const currentMeta = SECTION_META[activeSection]
 
-        {renderSection()}
-      </main>
-    </div>
+  return (
+    <AppShell
+      userName={session?.fullName || 'Professor(a)'}
+      userEmail={session?.email}
+      roleLabel="Docente"
+      pageTitle={currentMeta.title}
+      pageSubtitle={currentMeta.subtitle}
+      items={navItems}
+      bottomNavIds={['welcome', 'received', 'compose', 'alerts', 'insights']}
+      activeId={activeSection}
+      onSelect={setActiveSection}
+      onLogout={logout}
+      onRefresh={loadFeedbacks}
+      refreshLoading={loading}
+    >
+      {renderSection()}
+    </AppShell>
   )
 }
