@@ -8,6 +8,25 @@ from fastapi import HTTPException, status
 
 from ..schemas.user import UserPublic
 
+MANAGER_MANAGEABLE_ROLES = frozenset({"professor", "aluno"})
+
+
+def enforce_manageable_role(current_user: UserPublic, target_role: str) -> None:
+    """Ensure only global admins can assign privileged roles (admin/gestor)."""
+    if current_user.role == "admin":
+        return
+    if current_user.role == "gestor":
+        if target_role not in MANAGER_MANAGEABLE_ROLES:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Gestores só podem atribuir perfis de professor ou aluno",
+            )
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Perfil sem permissão para gerenciar usuários",
+    )
+
 
 def manager_school_or_error(user: UserPublic) -> int:
     if not user.school_id:

@@ -9,6 +9,7 @@ from fastapi import Depends
 from ....core.security import require_role
 from ....schemas.user import UserPublic
 from ....services.access_control import (
+    enforce_manageable_role as _enforce_manageable_role,
     enforce_same_school as _enforce_same_school,
     manager_school_or_error as _manager_school_or_error,
     resolve_school_assignment as _resolve_school_assignment,
@@ -47,6 +48,7 @@ def normalize_role_param(role: Optional[str]) -> Optional[str]:
 manager_school_or_error = _manager_school_or_error
 resolve_school_assignment = _resolve_school_assignment
 enforce_same_school = _enforce_same_school
+enforce_manageable_role = _enforce_manageable_role
 require_school = _require_school
 require_classroom = _require_classroom
 require_subject = _require_subject

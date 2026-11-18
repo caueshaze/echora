@@ -77,6 +77,8 @@ frontend/.env.*
 .env.production.local
 .env.test.local
 AGENTS.md
+SECURITY_AUDIT.md
+DEPLOY_SECURITY_CHECKLIST.md
 
 # === LOCKFILES (opcional) ===
 # descomente se quiser evitar travar dependências

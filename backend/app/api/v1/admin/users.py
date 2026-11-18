@@ -9,7 +9,7 @@ from ....core.database import get_session
 from ....models import User
 from ....schemas.user import UserCreate, UserPublic, UserUpdate
 from ....services import user_service
-from .deps import normalize_role_param, require_admin_user
+from .deps import enforce_manageable_role, normalize_role_param, require_admin_user
 
 router = APIRouter(prefix="/users")
 
@@ -24,6 +24,7 @@ def create_user(
     current_user: UserPublic = Depends(require_admin_user("admin", "gestor")),
     db: Session = Depends(get_session),
 ) -> UserPublic:
+    enforce_manageable_role(current_user, payload.role)
     created = user_service.create_user(db=db, payload=payload, current_user=current_user)
     return UserPublic.model_validate(created)
 
@@ -38,6 +39,8 @@ def update_user(
     current_user: UserPublic = Depends(require_admin_user("admin", "gestor")),
     db: Session = Depends(get_session),
 ) -> UserPublic:
+    if payload.role is not None:
+        enforce_manageable_role(current_user, payload.role)
     updated = user_service.update_user(
         db=db,
         user_id=user_id,

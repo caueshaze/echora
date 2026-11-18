@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session, selectinload
 from ..core.security import hash_password
 from ..models import Feedback, User
 from ..schemas.user import Role, UserCreate, UserPublic, UserUpdate
-from .access_control import manager_school_or_error, resolve_school_assignment
+from .access_control import (
+    MANAGER_MANAGEABLE_ROLES,
+    enforce_manageable_role,
+    manager_school_or_error,
+    resolve_school_assignment,
+)
 from .organization_service import (
     require_classroom,
     require_school,
@@ -54,6 +59,15 @@ def create_user(
     payload: UserCreate,
     current_user: UserPublic,
 ) -> User:
+    enforce_manageable_role(current_user, payload.role)
+
+    target_school_id = (
+        None
+        if payload.role == "admin"
+        else resolve_school_assignment(current_user, payload.school_id)
+    )
+    _ensure_school_for_role(payload.role, target_school_id)
+
     normalized_email = payload.email.lower()
     existing = db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
     if existing:
@@ -61,9 +75,6 @@ def create_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="E-mail já cadastrado",
         )
-
-    target_school_id = resolve_school_assignment(current_user, payload.school_id)
-    _ensure_school_for_role(payload.role, target_school_id)
 
     school = require_school(db, target_school_id) if target_school_id else None
     classroom = None
@@ -113,6 +124,14 @@ def update_user(
     payload: UserUpdate,
     current_user: UserPublic,
 ) -> User:
+    if current_user.role not in {"admin", "gestor"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Perfil sem permissão para gerenciar usuários",
+        )
+    if payload.role is not None:
+        enforce_manageable_role(current_user, payload.role)
+
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -131,15 +150,27 @@ def update_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Gestores só podem editar usuários da própria unidade",
             )
-        if user.role not in {"professor", "aluno"}:
+        if user.role not in MANAGER_MANAGEABLE_ROLES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Gestores só podem editar professores ou alunos",
             )
 
     target_role = payload.role or user.role
-    requested_school_id = payload.school_id if payload.school_id is not None else user.school_id
-    target_school_id = resolve_school_assignment(current_user, requested_school_id)
+    enforce_manageable_role(current_user, target_role)
+    if str(user.id) == str(current_user.id) and target_role != user.role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é permitido alterar o próprio cargo",
+        )
+
+    if target_role == "admin":
+        target_school_id = None
+    else:
+        requested_school_id = (
+            payload.school_id if payload.school_id is not None else user.school_id
+        )
+        target_school_id = resolve_school_assignment(current_user, requested_school_id)
     _ensure_school_for_role(target_role, target_school_id)
 
     school = require_school(db, target_school_id) if target_school_id else None
@@ -203,6 +234,8 @@ def update_user(
         user.teachable_subjects = teachable_subjects
     else:
         user.teachable_subjects = []
+        if user.assignments:
+            user.assignments.clear()
 
     db.add(user)
     db.commit()
@@ -272,6 +305,16 @@ def list_users(
 
 
 def delete_user(db: Session, user_id: str, current_user: UserPublic) -> None:
+    if current_user.role not in {"admin", "gestor"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Perfil sem permissão para gerenciar usuários",
+        )
+    if str(user_id) == str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é permitido remover a própria conta",
+        )
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -280,7 +323,7 @@ def delete_user(db: Session, user_id: str, current_user: UserPublic) -> None:
         )
     if current_user.role == "gestor":
         manager_school_id = manager_school_or_error(current_user)
-        if user.role not in {"professor", "aluno"}:
+        if user.role not in MANAGER_MANAGEABLE_ROLES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Gestores só podem remover professores ou alunos",
