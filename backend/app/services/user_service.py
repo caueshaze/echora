@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from typing import Optional
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from ..core.security import hash_password
-from ..models import Feedback, User
+from ..models import AuthSession, Feedback, User
 from ..schemas.user import Role, UserCreate, UserPublic, UserUpdate
 from .access_control import (
     MANAGER_MANAGEABLE_ROLES,
@@ -22,6 +23,14 @@ from .organization_service import (
     require_school,
     require_subject,
 )
+from .feedback_access import eligible_user_target_clause
+
+
+def _validate_role_password(password: str, role: str, email: str) -> None:
+    if role in {"admin", "gestor"} and len(password) < 12:
+        raise HTTPException(status_code=422, detail="A senha de gestão deve ter ao menos 12 caracteres")
+    if password.casefold() == email.casefold():
+        raise HTTPException(status_code=422, detail="A senha não pode ser igual ao e-mail")
 
 
 def _ensure_school_for_role(role: Role, school_id: Optional[int]) -> None:
@@ -60,6 +69,7 @@ def create_user(
     current_user: UserPublic,
 ) -> User:
     enforce_manageable_role(current_user, payload.role)
+    _validate_role_password(payload.password, payload.role, str(payload.email))
 
     target_school_id = (
         None
@@ -156,6 +166,8 @@ def update_user(
                 detail="Gestores só podem editar professores ou alunos",
             )
 
+    previous_role = user.role
+    previous_school_id = user.school_id
     target_role = payload.role or user.role
     enforce_manageable_role(current_user, target_role)
     if str(user.id) == str(current_user.id) and target_role != user.role:
@@ -196,6 +208,7 @@ def update_user(
     if payload.full_name:
         user.full_name = payload.full_name.strip()
     if payload.password:
+        _validate_role_password(payload.password, target_role, str(payload.email or user.email))
         user.hashed_password = hash_password(payload.password)
 
     if target_role == "professor":
@@ -237,6 +250,8 @@ def update_user(
         if user.assignments:
             user.assignments.clear()
 
+    if payload.password or target_role != previous_role or user.school_id != previous_school_id:
+        db.execute(update(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)).values(revoked_at=datetime.now(timezone.utc)))
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -259,29 +274,20 @@ def list_users(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Perfil sem permissão para listar todos os usuários",
         )
-    if normalized_role and current_user.role not in {"admin", "gestor"}:
-        allowed = {
-            "gestor": {"gestor", "professor", "aluno"},
-            "professor": {"gestor", "professor", "aluno"},
-            "aluno": {"gestor", "professor", "aluno"},
-        }
-        if current_user.role not in allowed.get(normalized_role, set()):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Perfil sem permissão para visualizar esse tipo de usuário",
-            )
-
     query = select(User).options(selectinload(User.teachable_subjects))
     if current_user.role == "gestor":
         manager_school_id = manager_school_or_error(current_user)
-        query = query.where(User.school_id == manager_school_id)
+        query = query.where(User.school_id == manager_school_id, User.role != "admin")
     elif current_user.role in {"professor", "aluno"}:
         if not current_user.school_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Seu perfil não está vinculado a uma unidade escolar",
             )
-        query = query.where(User.school_id == current_user.school_id)
+        sender = db.get(User, current_user.id)
+        if sender is None:
+            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+        query = query.where(eligible_user_target_clause(sender))
     elif current_user.role == "admin" and school_id is not None:
         query = query.where(User.school_id == school_id)
 
@@ -293,12 +299,10 @@ def list_users(
 
     if search and search.strip():
         pattern = f"%{search.strip()}%"
-        query = query.where(
-            or_(
-                User.full_name.ilike(pattern),
-                User.email.ilike(pattern),
-            )
-        )
+        if current_user.role in {"aluno", "professor"}:
+            query = query.where(User.full_name.ilike(pattern))
+        else:
+            query = query.where(or_(User.full_name.ilike(pattern), User.email.ilike(pattern)))
 
     query = query.order_by(User.full_name.asc()).offset(offset).limit(limit)
     return db.execute(query).scalars().all()

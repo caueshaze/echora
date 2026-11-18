@@ -132,7 +132,7 @@ export function UserRegistrationCard({
               id="password"
               type="password"
               className="input"
-              placeholder={mode === 'edit' ? 'Manter senha atual' : 'Mínimo de 6 caracteres'}
+              placeholder={mode === 'edit' ? 'Manter senha atual' : 'Mínimo de 10 caracteres (12 para gestão)'}
               value={form.password}
               onChange={handleInputChange}
               disabled={formDisabled}

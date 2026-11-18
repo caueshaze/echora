@@ -72,10 +72,16 @@ export function useGestorOverview({ isAdmin, managerSchoolId, adminSchoolFilterI
   }, [friendlyMessage, isAdmin, adminSchoolFilterId])
 
   const loadSummary = useCallback(async () => {
+    setSummary(null)
     setSummaryLoading(true)
     setSummaryStatus(null)
     try {
-      const params = managerSchoolId ? { school_id: managerSchoolId } : {}
+      const schoolId = isAdmin ? adminSchoolFilterId : managerSchoolId
+      if (isAdmin && !schoolId) {
+        setSummaryStatus('Selecione uma unidade escolar para gerar o resumo.')
+        return
+      }
+      const params = schoolId ? { school_id: schoolId } : {}
       const data = await fetchSummaryForAdmin(params)
       setSummary(data)
     } catch (error: any) {
@@ -83,7 +89,7 @@ export function useGestorOverview({ isAdmin, managerSchoolId, adminSchoolFilterI
     } finally {
       setSummaryLoading(false)
     }
-  }, [friendlyMessage, managerSchoolId])
+  }, [friendlyMessage, isAdmin, managerSchoolId, adminSchoolFilterId])
 
   const handleDeleteAllFeedbacks = useCallback(async () => {
     if (!isAdmin) return

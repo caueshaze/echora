@@ -76,9 +76,10 @@ frontend/.env.*
 .env.development.local
 .env.production.local
 .env.test.local
-AGENTS.md
-SECURITY_AUDIT.md
-DEPLOY_SECURITY_CHECKLIST.md
+
+# Documentação: manter somente o README principal versionado
+*.md
+!/README.md
 
 # === LOCKFILES (opcional) ===
 # descomente se quiser evitar travar dependências

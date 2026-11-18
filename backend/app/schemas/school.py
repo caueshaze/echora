@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SchoolBase(BaseModel):
-    name: str = Field(..., min_length=2, description="Nome da unidade escolar")
+    name: str = Field(..., min_length=2, max_length=255, description="Nome da unidade escolar")
     code: Optional[str] = Field(
         default=None,
         description="Identificador opcional para integrações (ex.: código interno)",

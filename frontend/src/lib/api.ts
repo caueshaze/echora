@@ -11,6 +11,7 @@ import type {
   FeedbackCreateInput,
   FeedbackMineResponse,
   FeedbackPublic,
+  FeedbackRecipient,
   FeedbackReportInput,
   FeedbackSummary,
   AdminMetricsOverview,
@@ -169,6 +170,12 @@ export function fetchUsersByRole(
   options: { classroom_id?: number; school_id?: number; search?: string } = {},
 ) {
   return fetchUsers({ role, limit: 500, ...options })
+}
+
+export function fetchFeedbackRecipients(role: AdminRole, classroomId?: number) {
+  const query = new URLSearchParams({ role })
+  if (classroomId) query.set('classroom_id', String(classroomId))
+  return authFetch<FeedbackRecipient[]>(`/api/v1/feedback/available/recipients?${query}`)
 }
 
 export function fetchAvailableSubjects() {

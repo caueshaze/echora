@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ClassroomBase(BaseModel):
-    name: str = Field(..., min_length=1, description="Nome da turma")
+    name: str = Field(..., min_length=1, max_length=255, description="Nome da turma")
     code: str | None = Field(
         default=None,
         max_length=64,

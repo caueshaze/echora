@@ -59,13 +59,13 @@ export function isTokenExpired(token: string, skewSeconds = 30): boolean {
   return payload.exp <= now + skewSeconds
 }
 
-async function refreshToken(currentToken: string): Promise<string | null> {
+let ongoingRefresh: Promise<string | null> | null = null
+
+async function performRefresh(): Promise<string | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${currentToken}`,
-      },
+      credentials: 'include',
     })
     if (!response.ok) {
       return null
@@ -81,13 +81,26 @@ async function refreshToken(currentToken: string): Promise<string | null> {
   }
 }
 
+function refreshToken(): Promise<string | null> {
+  if (!ongoingRefresh) {
+    ongoingRefresh = performRefresh().finally(() => { ongoingRefresh = null })
+  }
+  return ongoingRefresh
+}
+
+export async function logoutSession(): Promise<void> {
+  if (ongoingRefresh) await ongoingRefresh
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' })
+  if (!response.ok) throw new Error('Não foi possível encerrar a sessão no servidor.')
+}
+
 export async function ensureValidAccessToken(skewSeconds = 30): Promise<string | null> {
     const token = getToken()
     if (!token) {
         return null
     }
   if (isTokenExpired(token, skewSeconds)) {
-    return await refreshToken(token)
+    return await refreshToken()
   }
   return token
 }
@@ -122,5 +135,5 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!token) {
     return null
   }
-  return refreshToken(token)
+  return refreshToken()
 }

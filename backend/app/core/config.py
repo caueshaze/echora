@@ -7,14 +7,17 @@ import os
 import base64
 import binascii
 import hashlib
+import ipaddress
+import re
 import warnings
 from functools import lru_cache
 from typing import List, Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # backend/app
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -23,142 +26,201 @@ class Settings(BaseSettings):
     # ===== BÁSICO =====
     project_name: str = Field(
         default="Echora Sentiment API",
-        env="PROJECT_NAME",
     )
     api_version: str = Field(
         default="0.2.0",
-        env="API_VERSION",
     )
     model_path: str = Field(
         default="models/sentiment.joblib",
-        env="MODEL_PATH",
     )
     app_env: Literal["development", "production", "test"] = Field(
         default="development",
-        env="APP_ENV",
     )
     debug: bool = Field(
-        default=True,
-        env="DEBUG",
+        default=False,
     )
 
     # ===== CORS =====
     cors_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
-        env="CORS_ORIGINS",
     )
 
     # ===== AUTH =====
     secret_key: str = Field(
         default="change-me",
-        env="SECRET_KEY",
     )
     jwt_algorithm: str = Field(
         default="HS256",
-        env="JWT_ALGORITHM",
     )
     jwt_issuer: str = Field(
         default="echora",
-        env="JWT_ISSUER",
     )
     access_token_expire_minutes: int = Field(
         default=60,
-        env="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
+    session_max_days: int = Field(default=7, ge=1, le=30)
+    data_encryption_active_key: str = "v1"
+    data_encryption_keys: str = "{}"
     data_encryption_key: str = Field(
         default="",
-        env="DATA_ENCRYPTION_KEY",
     )
 
     # ===== RATE LIMITING =====
     rate_limit_requests: int = Field(
         default=60,
-        env="RATE_LIMIT_REQUESTS",
     )
     rate_limit_window_seconds: int = Field(
         default=60,
-        env="RATE_LIMIT_WINDOW_SECONDS",
     )
+    rate_limit_storage_uri: str = ""
 
     # ===== DB =====
     database_url: str = Field(
         default="sqlite:///./echora.db",
-        env="DATABASE_URL",
     )
 
     # ===== LOGGING =====
     log_dir: str = Field(
         default="logs",
-        env="LOG_DIR",
     )
 
     # ===== MODELO DE SENTIMENTO (ONNX LOCAL) =====
     sentiment_model_path: str = Field(
         default="models/model.onnx",
-        env="SENTIMENT_MODEL_PATH",
     )
 
     # ===== SENTIMENT REMOTO (VM ONNX) =====
     sentiment_api_url: str = Field(
         default="",
-        env="SENTIMENT_API_URL",
     )
+    allow_loopback_http_integrations: bool = False
     sentiment_api_key: str = Field(
         default="",
-        env="SENTIMENT_API_KEY",
     )
 
     # ===== LLM / SUMÁRIO COM IA =====
     summary_provider: str = Field(
         default="openai",
-        env="SUMMARY_PROVIDER",
     )
     summary_model: str = Field(
         default="gpt-5-nano",
-        env="SUMMARY_MODEL",
     )
     openai_api_key: str = Field(
         default="",
-        env="OPENAI_API_KEY",
     )
     openai_api_base: str = Field(
         default="https://api.openai.com/v1",
-        env="OPENAI_API_BASE",
     )
 
     # Configurações legadas (compatibilidade)
     llm_provider: str = Field(
         default="openai",
-        env="LLM_PROVIDER",
     )
     gemma_model_dir: str = Field(
         default="models/gemma-2b-it",
-        env="GEMMA_MODEL_DIR",
     )
     gemma_enabled: bool = Field(
         default=False,
-        env="GEMMA_ENABLED",
     )
     gemma_api_url: str = Field(
         default="",
-        env="GEMMA_API_URL",
     )
     gemma_api_key: str = Field(
         default="",
-        env="GEMMA_API_KEY",
     )
 
-    class Config:
-        # Em dev você ainda pode usar um .env padrão se quiser
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8",
+        case_sensitive=False, extra="ignore", hide_input_in_errors=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_production(self) -> "Settings":
+        if not self.is_production:
+            return self
+        if self.debug:
+            raise ValueError("DEBUG deve estar desativado em produção")
+        if not self.rate_limit_storage_uri.startswith(("redis://", "rediss://")):
+            raise ValueError("RATE_LIMIT_STORAGE_URI deve apontar para Redis em produção")
+        self._validate_remote_integrations()
+        if self.normalized_database_url().lower().startswith("sqlite"):
+            raise ValueError("SQLite não é permitido em produção")
+        if any("*" in origin for origin in self.cors_origins.split(",")):
+            raise ValueError("CORS não pode conter wildcard em produção")
+        secret = self.secret_key.strip()
+        if (len(secret.encode("utf-8")) < 32 or len(set(secret)) < 12
+                or re.search(r"change.?me|insecure|substitua|placeholder|example|your.?secret", secret, re.I)):
+            raise ValueError("SECRET_KEY deve ser uma chave exclusiva e forte de pelo menos 32 bytes")
+        key = self._production_encryption_key()
+        secret_bytes = secret.encode("utf-8")
+        if key == secret_bytes:
+            raise ValueError("DATA_ENCRYPTION_KEY deve ser diferente de SECRET_KEY")
+        if re.fullmatch(r"[0-9a-fA-F]+", secret) and len(secret) % 2 == 0:
+            secret_bytes = bytes.fromhex(secret)
+            if len(secret_bytes) < 32:
+                raise ValueError("SECRET_KEY hexadecimal deve ter pelo menos 32 bytes")
+        if key == secret_bytes:
+            raise ValueError("DATA_ENCRYPTION_KEY deve ser diferente de SECRET_KEY")
+        try:
+            decoded_secret = base64.b64decode(secret, altchars=b"-_", validate=True)
+        except (binascii.Error, ValueError, UnicodeEncodeError):
+            decoded_secret = b""
+        if key == decoded_secret:
+            raise ValueError("DATA_ENCRYPTION_KEY deve ser diferente de SECRET_KEY")
+        return self
+
+    def _validate_remote_integrations(self) -> None:
+        urls = {
+            "OPENAI_API_BASE": self.openai_api_base,
+            "SENTIMENT_API_URL": self.sentiment_api_url,
+            "GEMMA_API_URL": self.gemma_api_url,
+        }
+        for name, raw in urls.items():
+            self.validate_integration_url(name, raw)
+
+    def validate_integration_url(self, name: str, raw: str) -> None:
+        """Validate the effective destination before any production HTTP request."""
+        if not self.is_production or not raw.strip():
+            return
+        try:
+            parsed = urlsplit(raw.strip())
+            # Accessing .port validates malformed and out-of-range ports.
+            _ = parsed.port
+            hostname = parsed.hostname
+        except ValueError:
+            raise ValueError(f"{name} contém uma URL inválida") from None
+
+        if not hostname or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError(f"{name} contém uma URL inválida")
+        if parsed.scheme == "https":
+            return
+
+        is_loopback = hostname.lower() == "localhost"
+        try:
+            is_loopback = is_loopback or ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            pass
+        if (parsed.scheme == "http" and is_loopback
+                and self.allow_loopback_http_integrations):
+            return
+        raise ValueError(f"{name} deve usar HTTPS; HTTP só é aceito para loopback autorizado explicitamente")
+
+    def _production_encryption_key(self) -> bytes:
+        raw = self.data_encryption_key.strip()
+        try:
+            key = base64.b64decode(raw, altchars=b"-_", validate=True)
+        except (binascii.Error, ValueError, UnicodeEncodeError):
+            raise ValueError("DATA_ENCRYPTION_KEY deve ser Base64 válido de 32 bytes") from None
+        if (len(key) != 32 or len(set(key)) < 16 or
+                re.search(r"change.?me|insecure|substitua|placeholder|example", raw, re.I)):
+            raise ValueError("DATA_ENCRYPTION_KEY deve ser uma chave aleatória de 32 bytes em Base64")
+        return key
 
     # ===== HELPERS =====
 
     @property
     def is_production(self) -> bool:
-        return self.app_env == "production" and not self.debug
+        return self.app_env == "production"
 
     def cors_origin_list(self) -> List[str]:
         """Return a sanitized list of allowed CORS origins."""
@@ -200,10 +262,11 @@ class Settings(BaseSettings):
         """
         Return a 16/24/32-byte key for AES-GCM.
 
-        Accepts base64, hex or raw text. In development, if DATA_ENCRYPTION_KEY is
-        missing, the value is derived deterministically from SECRET_KEY so the API
-        continues working without leaking secrets in logs.
+        Production requires a 32-byte Base64 key. Development retains the
+        legacy coercion and SECRET_KEY fallback for existing local data.
         """
+        if self.is_production:
+            return self._production_encryption_key()
         raw = (self.data_encryption_key or "").strip()
         if not raw:
             if self.is_production:
@@ -253,12 +316,11 @@ def get_settings() -> Settings:
     else:
         env_file = ".env.dev"
 
-    # Resolve relativo ao diretório do módulo (backend/app)
-    base_dir = Path(__file__).resolve().parent
-    candidate = base_dir / env_file
+    candidate = PROJECT_ROOT / env_file
 
     if candidate.exists():
         return Settings(_env_file=str(candidate))
 
-    # Em ambiente tipo Azure App Service, usamos apenas variáveis de ambiente
+    if env in {"production", "test"}:
+        return Settings(_env_file=None)
     return Settings()

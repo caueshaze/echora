@@ -5,14 +5,27 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 Role = Literal["admin", "gestor", "professor", "aluno"]
 
 
+def validate_new_password(value: str) -> str:
+    if len(value.encode("utf-8")) > 72:
+        raise ValueError("A senha deve ter no máximo 72 bytes UTF-8")
+    if value.lower() in {"1234567890", "123456789012", "password123", "senha12345", "qwerty12345"}:
+        raise ValueError("Escolha uma senha menos comum")
+    return value
+
+
 class UserBase(BaseModel):
     email: EmailStr = Field(..., description="E-mail institucional único")
-    full_name: str = Field(..., min_length=1, description="Nome completo do usuário")
+    full_name: str = Field(..., min_length=1, max_length=255, description="Nome completo do usuário")
     role: Role = Field(..., description="Perfil associado ao usuário")
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=6, description="Senha em texto puro")
+    password: str = Field(..., min_length=10, max_length=72, description="Senha em texto puro")
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: str) -> str:
+        return validate_new_password(value)
     school_id: Optional[int] = Field(
         default=None,
         description="ID da unidade/escola associada",
@@ -65,6 +78,14 @@ class UserCreate(UserBase):
         return normalized or None
 
 
+class UserRecipient(BaseModel):
+    id: str
+    full_name: str
+    role: Role
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserPublic(UserBase):
     id: str
     school_id: Optional[int] = None
@@ -78,10 +99,15 @@ class UserPublic(UserBase):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = Field(default=None, min_length=1)
+    full_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     email: Optional[EmailStr] = None
     role: Optional[Role] = None
-    password: Optional[str] = Field(default=None, min_length=6)
+    password: Optional[str] = Field(default=None, min_length=10, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, value: Optional[str]) -> Optional[str]:
+        return validate_new_password(value) if value is not None else None
     school_id: Optional[int] = None
     classroom_id: Optional[int] = None
     teachable_subject_ids: Optional[list[int]] = None

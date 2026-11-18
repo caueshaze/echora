@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class PredictItem(BaseModel):
-    texto: str = Field(..., min_length=3, description="Feedback em texto")
+    texto: str = Field(..., min_length=3, max_length=4000, description="Feedback em texto")
     author_role: Optional[str] = Field(
         default="aluno", description="aluno|professor|coordenador"
     )
@@ -24,7 +24,7 @@ class PredictResponse(BaseModel):
 
 
 class PredictBatchRequest(BaseModel):
-    items: List[PredictItem]
+    items: List[PredictItem] = Field(..., max_length=50)
 
 
 class PredictBatchResponseItem(BaseModel):

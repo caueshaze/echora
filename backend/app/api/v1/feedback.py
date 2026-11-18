@@ -4,13 +4,14 @@ from datetime import datetime
 from itertools import chain
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session, aliased, joinedload
 
 from ...core.crypto import encrypt_feedback
 from ...core.database import get_session
 from ...core.security import get_current_user, require_role
+from ...core.rate_limit import get_rate_limiter, summary_rate_key
 from ...core.sentiment import analyze_sentiment
 from ...core.triggers import detect_triggers, load_trigger_keywords
 from ...core.llm import (
@@ -29,7 +30,8 @@ from ...schemas.feedback import (
 from ...schemas.subject import SubjectPublic
 from ...schemas.classroom import ClassroomPublic
 from ...schemas.summary import FeedbackSummary
-from ...schemas.user import UserPublic
+from ...schemas.user import UserPublic, UserRecipient
+from ...services.feedback_access import eligible_user_target_clause
 from .feedback_utils import (
     _assert_class_permission,
     _assert_subject_permission,
@@ -46,6 +48,7 @@ from .feedback_utils import (
 )
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
+limiter = get_rate_limiter()
 
 
 @router.post(
@@ -61,10 +64,6 @@ def create_feedback(
 ) -> FeedbackPublic:
     """Persist a feedback entry applying trigger detection, encryption and sentiment."""
     db_user = _load_current_user_profile(db, current_user.id)
-    keywords = load_trigger_keywords(db, current_user.school_id)
-    triggers = detect_triggers(payload.content, keywords)
-    cipher_text, nonce = encrypt_feedback(payload.content)
-
     target_user: User | None = None
     target_name: str | None = None
     target_role_label: str | None = None
@@ -74,15 +73,12 @@ def create_feedback(
 
     if payload.target_type == "user":
         target_user_id = str(payload.target_id)
-        target_user = db.get(User, target_user_id)
+        target_user = db.scalar(select(User).where(
+            User.id == target_user_id, eligible_user_target_clause(db_user)
+        ))
         if not target_user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Usuário destino não encontrado"
-            )
-        if target_user.role == "admin" and current_user.role != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Não é permitido enviar feedbacks para administradores",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Destinatário não disponível"
             )
         target_name = target_user.full_name
         target_role_label = target_user.role
@@ -109,8 +105,11 @@ def create_feedback(
             detail="Tipo de destino inválido",
         )
 
-    sentiment_label, sentiment_score = analyze_sentiment(payload.content)
+    keywords = load_trigger_keywords(db, current_user.school_id)
+    triggers = detect_triggers(payload.content, keywords)
     effective_anonymous = bool(payload.is_anonymous and current_user.role == "aluno")
+    cipher_text, nonce = encrypt_feedback(payload.content, sender_id=current_user.id, target_type=payload.target_type, target_id=resolved_target_id, is_anonymous=effective_anonymous)
+    sentiment_label, sentiment_score = analyze_sentiment(payload.content)
     feedback = Feedback(
         sender_id=current_user.id,
         target_type=payload.target_type,
@@ -138,6 +137,24 @@ def create_feedback(
         target_school_id=target_school_id or getattr(target_user, "school_id", None),
         viewer=current_user,
     )
+
+
+@router.get(
+    "/available/recipients",
+    response_model=List[UserRecipient],
+    summary="Lista destinatários elegíveis para feedback",
+)
+def list_feedback_recipients(
+    role: str = Query(...),
+    classroom_id: int | None = Query(default=None, gt=0),
+    current_user: UserPublic = Depends(get_current_user),
+    db: Session = Depends(get_session),
+) -> List[UserRecipient]:
+    sender = _load_current_user_profile(db, current_user.id)
+    query = select(User).where(eligible_user_target_clause(sender), User.role == role)
+    if classroom_id is not None:
+        query = query.where(User.classroom_id == classroom_id)
+    return [UserRecipient.model_validate(user) for user in db.scalars(query.order_by(User.full_name)).all()]
 
 
 @router.get(
@@ -628,7 +645,10 @@ def delete_my_feedback(
     response_model=FeedbackSummary,
     summary="Resumo com IA para o usuário autenticado",
 )
+@limiter.limit("3/hour", key_func=summary_rate_key)
 def summarize_my_feedbacks(
+    request: Request,
+    response: Response,
     current_user: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> FeedbackSummary:
@@ -640,9 +660,12 @@ def summarize_my_feedbacks(
     response_model=FeedbackSummary,
     summary="Resumo estratégico com IA para administradores/gestores",
 )
+@limiter.limit("3/hour", key_func=summary_rate_key)
 def summarize_all_feedbacks(
-    _: UserPublic = Depends(require_role("admin", "gestor")),
+    request: Request,
+    response: Response,
+    current_user: UserPublic = Depends(require_role("admin", "gestor")),
     db: Session = Depends(get_session),
-    school_id: str | None = Query(default=None, description="Filtra por escola quando aplicável"),
+    school_id: int | None = Query(default=None, gt=0, description="Unidade escolar do resumo"),
 ) -> FeedbackSummary:
-    return generate_admin_summary(db=db, school_id=school_id)
+    return generate_admin_summary(db=db, current_user=current_user, school_id=school_id)

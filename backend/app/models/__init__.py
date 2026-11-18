@@ -5,6 +5,7 @@ from .organization import School, Classroom, Subject
 from .assignment import TeacherAssignment
 from .feedback import Feedback
 from .trigger import TriggerKeyword
+from .auth_session import AuthSession
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "TeacherAssignment",
     "Feedback",
     "TriggerKeyword",
+    "AuthSession",
 ]

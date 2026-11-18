@@ -53,6 +53,8 @@ export type DirectoryUser = {
   teachable_subject_ids?: number[]
 }
 
+export type FeedbackRecipient = Pick<DirectoryUser, 'id' | 'full_name' | 'role'>
+
 export type AdminUserCreateInput = {
   full_name: string
   email: string

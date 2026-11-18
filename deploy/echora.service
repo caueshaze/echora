@@ -1,0 +1,24 @@
+[Unit]
+Description=Echora API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=echora
+Group=echora
+WorkingDirectory=/opt/echora
+EnvironmentFile=/etc/echora/echora.env
+Environment=APP_ENV=production
+Environment=DEBUG=false
+ExecStart=/opt/echora/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/echora
+
+[Install]
+WantedBy=multi-user.target

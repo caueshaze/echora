@@ -10,7 +10,7 @@ from ....core.database import get_session
 from ....models import Classroom, School, Subject, User
 from ....schemas.school import SchoolCreate, SchoolPublic, SchoolUpdate
 from ....schemas.user import UserPublic
-from .deps import require_admin_user
+from .deps import manager_school_or_error, require_admin_user
 
 router = APIRouter(prefix="/schools")
 
@@ -60,10 +60,13 @@ def create_school(
     summary="Lista unidades escolares",
 )
 def list_schools(
-    _: UserPublic = Depends(require_admin_user("admin", "gestor")),
+    current_user: UserPublic = Depends(require_admin_user("admin", "gestor")),
     db: Session = Depends(get_session),
 ) -> list[SchoolPublic]:
-    schools = db.execute(select(School).order_by(School.name)).scalars().all()
+    query = select(School)
+    if current_user.role == "gestor":
+        query = query.where(School.id == manager_school_or_error(current_user))
+    schools = db.execute(query.order_by(School.name)).scalars().all()
     return [SchoolPublic.model_validate(item) for item in schools]
 
 

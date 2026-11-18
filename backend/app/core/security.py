@@ -4,14 +4,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .database import get_session
-from ..models import User
+from ..models import AuthSession, User
 from ..schemas.user import UserPublic
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -73,12 +74,13 @@ def decode_access_token(*, token: str, settings: Settings) -> Dict[str, Any]:
             issuer=settings.jwt_issuer,
             options={"require": ["exp", "iat", "iss"]},
         )
-    except JWTError as exc:  # pragma: no cover - thin wrapper
+    except PyJWTError as exc:  # pragma: no cover - thin wrapper
         raise AuthenticationError("Token inválido") from exc
     return payload
 
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_session),
@@ -95,10 +97,22 @@ def get_current_user(
     # IDs agora são strings (UUID); não tentamos converter para int
     user_id = str(subject)
 
+    session_id = payload.get("sid")
+    if not session_id:
+        raise AuthenticationError("Sessão inválida")
+    session = db.get(AuthSession, session_id)
+    now = datetime.now(timezone.utc)
+    if not session or session.user_id != user_id or session.revoked_at is not None:
+        raise AuthenticationError("Sessão revogada")
+    expires_at = session.expires_at.replace(tzinfo=timezone.utc) if session.expires_at.tzinfo is None else session.expires_at
+    if expires_at <= now:
+        raise AuthenticationError("Sessão expirada")
+
     user = db.get(User, user_id)
     if not user:
         raise AuthenticationError("Usuário não encontrado")
 
+    request.state.user_id = user.id
     return UserPublic.model_validate(user)
 
 def require_role(*roles: str) -> Callable[[UserPublic], UserPublic]:

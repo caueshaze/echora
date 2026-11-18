@@ -19,14 +19,18 @@ import logging
 import os
 import re
 from time import perf_counter
+from threading import BoundedSemaphore
 from typing import Iterable, Sequence, List, Optional
 
 import httpx
 
-from sqlalchemy import desc, select
+from fastapi import HTTPException
+from sqlalchemy import String, and_, cast, desc, exists, or_, select
 from sqlalchemy.orm import Session
 
-from ..models import Feedback
+from ..models import Feedback, User
+from ..models.organization import Classroom, Subject
+from ..services.access_control import resolve_school_assignment
 from ..schemas.summary import FeedbackSummary
 from ..schemas.user import UserPublic
 from .config import get_settings
@@ -46,6 +50,7 @@ except Exception:  # pragma: no cover
 _LLM_MODEL = None
 _LLM_TOKENIZER = None
 _LLM_READY = False
+_SUMMARY_SLOTS = BoundedSemaphore(5)
 
 
 # ==========================================================
@@ -240,6 +245,7 @@ def _run_openai(prompt_text: str, max_new_tokens: int = 500) -> str:
 
     base_url = (settings.openai_api_base or "https://api.openai.com/v1").rstrip("/")
     endpoint = f"{base_url}/chat/completions"
+    settings.validate_integration_url("OPENAI_API_BASE", endpoint)
     model = settings.summary_model or "gpt-5-nano"
 
     LOGGER.info("Enviando solicitação de resumo à OpenAI (modelo: %s, endpoint: %s)", model, endpoint)
@@ -260,15 +266,16 @@ def _run_openai(prompt_text: str, max_new_tokens: int = 500) -> str:
             },
             {"role": "user", "content": prompt_text},
         ],
-        "temperature": 0.7,
+        "max_completion_tokens": max_new_tokens,
+        "store": False,
     }
 
     try:
-        with httpx.Client(timeout=45.0) as client:
+        with httpx.Client(timeout=45.0, follow_redirects=False) as client:
             resp = client.post(endpoint, headers=headers, json=payload)
             if resp.status_code != 200:
-                LOGGER.error("Erro na resposta da OpenAI (%s): %s", resp.status_code, resp.text)
-                raise RuntimeError(f"Erro na API da OpenAI ({resp.status_code}): {resp.text}")
+                LOGGER.error("Erro na resposta da OpenAI (%s)", resp.status_code)
+                raise RuntimeError(f"Erro na API da OpenAI ({resp.status_code})")
             data = resp.json()
             raw_text = data["choices"][0]["message"]["content"].strip()
             return _post_process_summary(raw_text)
@@ -294,11 +301,6 @@ def _run_llm(prompt_text: str, max_new_tokens: int = 260) -> str:
     _ensure_gemma()
     assert _LLM_MODEL is not None
     assert _LLM_TOKENIZER is not None
-
-    LOGGER.info(
-        "\n\n=== PROMPT ENVIADO AO GEMMA ===\n%s\n================================\n",
-        prompt_text,
-    )
 
     inputs = _LLM_TOKENIZER(
         prompt_text,
@@ -334,14 +336,10 @@ def _run_llm(prompt_text: str, max_new_tokens: int = 260) -> str:
     gen_ids = output_ids[0, prompt_len:]
     raw = _LLM_TOKENIZER.decode(gen_ids, skip_special_tokens=True).strip()
 
-    LOGGER.info("=== RAW POS-PROMPT GERADO PELO GEMMA === %r", raw)
-
     text = _post_process_summary(raw)
 
-    LOGGER.info("=== TEXTO FINAL APÓS PÓS-PROCESSAMENTO === %r", text)
-
     if not text or len(text.split()) < 15:
-        raise RuntimeError(f"Resumo inválido ou muito curto gerado pelo LLM: {repr(text)}")
+        raise RuntimeError("Resumo inválido ou muito curto gerado pelo LLM")
 
     return text
 
@@ -368,11 +366,7 @@ def _decrypt_and_bucket(
     neutrals: List[str] = []
 
     for fb in feedbacks:
-        try:
-            text = decrypt_feedback(fb.content_encrypted, fb.nonce)
-        except Exception:
-            LOGGER.warning("Erro ao descriptografar feedback %s", fb.id)
-            continue
+        text = decrypt_feedback(fb)
 
         label = (fb.sentiment_label or "").lower()
         if label.startswith("pos"):
@@ -502,6 +496,15 @@ def _build_prompt(
 # ==========================================================
 # Sumário e integração com as rotas
 # ==========================================================
+def _redact_personal_data(text: str, known_name: str = "") -> str:
+    """Remove common direct identifiers; free text can still identify people."""
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[e-mail removido]", text)
+    text = re.sub(r"(?<!\w)(?:\+?\d[\d .()/-]{8,}\d)(?!\w)", "[número removido]", text)
+    if len(known_name.strip()) >= 3:
+        text = re.sub(re.escape(known_name.strip()), "[nome removido]", text, flags=re.IGNORECASE)
+    return text
+
+
 def _summarize_feedbacks(
     db: Session,
     where_clause,
@@ -518,7 +521,7 @@ def _summarize_feedbacks(
 
     LOGGER.info(
         "Gerando resumo LLM (Gemma) para '%s' (%s): %d feedbacks (pos=%d, neg=%d, neutro=%d)",
-        subject,
+        "destinatário",
         audience,
         total,
         len(positives),
@@ -527,14 +530,19 @@ def _summarize_feedbacks(
     )
 
     prompt = _build_prompt(
-        recipient_name=subject,
-        positives=positives,
-        negatives=negatives,
-        neutrals=neutrals,
+        recipient_name={"professor": "docente", "aluno": "estudante", "gestor": "unidade escolar"}.get(audience, "pessoa"),
+        positives=[_redact_personal_data(value, subject) for value in positives],
+        negatives=[_redact_personal_data(value, subject) for value in negatives],
+        neutrals=[_redact_personal_data(value, subject) for value in neutrals],
         audience=audience,
     )
 
-    summary_text = _run_llm(prompt)
+    if not _SUMMARY_SLOTS.acquire(blocking=False):
+        raise HTTPException(status_code=503, detail="Limite de resumos simultâneos atingido; tente novamente")
+    try:
+        summary_text = _run_llm(prompt, max_new_tokens=768)
+    finally:
+        _SUMMARY_SLOTS.release()
 
     return FeedbackSummary(
         summary_text=summary_text,
@@ -565,9 +573,23 @@ def generate_personal_summary(
 
 def generate_admin_summary(
     db: Session,
-    school_id: Optional[str] = None,
+    current_user: UserPublic,
+    school_id: Optional[int] = None,
 ) -> FeedbackSummary:
-    subject = f"a unidade {school_id}" if school_id else "a instituição"
+    if current_user.role not in ("admin", "gestor"):
+        raise HTTPException(status_code=403, detail="Perfil sem permissão para acessar resumos")
+    school_id = resolve_school_assignment(current_user, school_id)
+    if school_id is None or isinstance(school_id, bool) or not isinstance(school_id, int) or school_id <= 0:
+        raise HTTPException(status_code=400, detail="Selecione uma unidade escolar para gerar o resumo")
+    subject = f"a unidade {school_id}"
     audience = "gestor"
-    where_clause = None
+    # Both ends must belong to the selected school. Unknown/deleted targets and
+    # cross-school feedbacks are excluded rather than assigned speculatively.
+    sender_in_school = exists(select(User.id).where(User.id == Feedback.sender_id, User.school_id == school_id))
+    target_in_school = or_(
+        and_(Feedback.target_type == "user", exists(select(User.id).where(User.id == Feedback.target_id, User.school_id == school_id))),
+        and_(Feedback.target_type == "subject", exists(select(Subject.id).where(cast(Subject.id, String) == Feedback.target_id, Subject.school_id == school_id))),
+        and_(Feedback.target_type == "class", exists(select(Classroom.id).where(cast(Classroom.id, String) == Feedback.target_id, Classroom.school_id == school_id))),
+    )
+    where_clause = and_(sender_in_school, target_in_school)
     return _summarize_feedbacks(db, where_clause, subject, audience)

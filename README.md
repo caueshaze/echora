@@ -189,3 +189,8 @@ A página do gestor (em React) exibe:
 -   **Modelos:** não envie arquivos `.onnx`, `.bin` ou `.pt` ao GitHub (veja `.gitignore`).
     
 -   **Uso Educacional:** protótipo acadêmico, não pronto para produção.
+## Implantação segura
+
+Veja [PostgreSQL e migrações](docs/postgresql-migracoes.md). Os modelos em `deploy/` exigem revisão dos domínios, caminhos, certificados, Redis, firewall e privilégios antes do uso. Compile o frontend com `VITE_API_BASE_URL=""` para servir a API na mesma origem; configure `ECHORA_HOST` e `ECHORA_FRONTEND_ROOT` no Caddy. Execute o backup criptografado como tarefa agendada e teste a restauração e a chave de descriptografia fora do servidor.
+
+Veja também [notas de implantação de segurança](docs/seguranca-implantacao.md).

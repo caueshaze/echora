@@ -5,13 +5,13 @@ import {
   createFeedback,
   fetchAvailableClassrooms,
   fetchAvailableSubjects,
-  fetchUsersByRole,
+  fetchFeedbackRecipients,
 } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import type {
   AdminRole,
   Classroom,
-  DirectoryUser,
+  FeedbackRecipient,
   FeedbackCreateInput,
   FeedbackPublic,
   FeedbackTargetType,
@@ -78,7 +78,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
   const [targetRole, setTargetRole] = useState<AdminRole | ''>('')
   const [studentClassroomId, setStudentClassroomId] = useState<string>('')
   const [recipientSearch, setRecipientSearch] = useState('')
-  const [recipients, setRecipients] = useState<DirectoryUser[]>([])
+  const [recipients, setRecipients] = useState<FeedbackRecipient[]>([])
   const [recipientsStatus, setRecipientsStatus] = useState<string | null>(null)
   const [recipientsLoading, setRecipientsLoading] = useState(false)
 
@@ -112,7 +112,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
     }
     setClassroomsLoading(true)
     setClassroomsStatus('Carregando turmas...')
-    fetchAvailableClassrooms({ forUserLookup: isStudentTarget })
+    fetchAvailableClassrooms()
       .then((data) => {
         setClassrooms(data)
         setClassroomsStatus(
@@ -151,12 +151,11 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
     setRecipientsLoading(true)
     setRecipientsStatus('Buscando destinatários...')
 
-    const queryOptions =
-      targetRole === 'aluno' && studentClassroomId
-        ? { classroom_id: Number(studentClassroomId) }
-        : {}
+    const classroomId = targetRole === 'aluno' && studentClassroomId
+      ? Number(studentClassroomId)
+      : undefined
 
-    fetchUsersByRole(targetRole, queryOptions)
+    fetchFeedbackRecipients(targetRole, classroomId)
       .then((data) => {
         const filtered = data.filter((user) => String(user.id) !== String(session?.id))
         setRecipients(filtered)
@@ -205,8 +204,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
     if (!query) return recipients
     return recipients.filter(
       (recipient) =>
-        recipient.full_name.toLowerCase().includes(query) ||
-        recipient.email.toLowerCase().includes(query),
+        recipient.full_name.toLowerCase().includes(query),
     )
   }, [recipients, recipientSearch])
 

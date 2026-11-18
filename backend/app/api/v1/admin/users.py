@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_session
 from ....models import User
-from ....schemas.user import UserCreate, UserPublic, UserUpdate
+from ....schemas.user import UserCreate, UserPublic, UserRecipient, UserUpdate
 from ....services import user_service
 from .deps import enforce_manageable_role, normalize_role_param, require_admin_user
 
@@ -52,7 +52,7 @@ def update_user(
 
 @router.get(
     "",
-    response_model=list[UserPublic],
+    response_model=list[UserPublic | UserRecipient],
     summary="Lista usuários com paginação e filtros por turma/escola/busca",
 )
 def list_users(
@@ -66,7 +66,7 @@ def list_users(
     classroom_id: int | None = Query(default=None),
     school_id: int | None = Query(default=None),
     search: str | None = Query(default=None),
-) -> list[UserPublic]:
+) -> list[UserPublic | UserRecipient]:
     normalized_role = normalize_role_param(role)
     if normalized_role is None and role is not None:
         raise HTTPException(
@@ -83,7 +83,8 @@ def list_users(
         offset=offset,
         limit=limit,
     )
-    return [UserPublic.model_validate(user) for user in result]
+    schema = UserRecipient if current_user.role in {"aluno", "professor"} else UserPublic
+    return [schema.model_validate(user) for user in result]
 
 
 @router.get(

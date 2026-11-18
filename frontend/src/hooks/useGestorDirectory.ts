@@ -269,13 +269,14 @@ export function useGestorDirectory({ isAdmin, isManager, managerSchoolId }: UseG
         return
       }
       const role = userForm.role as AdminRole
-      const trimmedPassword = userForm.password.trim()
-      if (userFormMode === 'create' && trimmedPassword.length < 6) {
-        setUserFormStatus('A senha temporária deve ter ao menos 6 caracteres.')
+      const password = userForm.password
+      const minimumLength = role === 'admin' || role === 'gestor' ? 12 : 10
+      if ((userFormMode === 'create' || password) && Array.from(password).length < minimumLength) {
+        setUserFormStatus(`A senha deve ter ao menos ${minimumLength} caracteres.`)
         return
       }
-      if (userFormMode === 'edit' && trimmedPassword && trimmedPassword.length < 6) {
-        setUserFormStatus('A senha temporária deve ter ao menos 6 caracteres.')
+      if (new TextEncoder().encode(password).length > 72) {
+        setUserFormStatus('A senha deve ter no máximo 72 bytes UTF-8.')
         return
       }
 
@@ -314,8 +315,8 @@ export function useGestorDirectory({ isAdmin, isManager, managerSchoolId }: UseG
             classroom_id: role === 'aluno' ? classroomId : undefined,
             teachable_subject_ids: role === 'professor' ? teachableSubjectIds : undefined,
           }
-          if (trimmedPassword) {
-            updatePayload.password = trimmedPassword
+          if (password) {
+            updatePayload.password = password
           }
           await updateAdminUser(userEditingId, updatePayload)
           setUserFormStatus('Usuário atualizado!')
@@ -323,7 +324,7 @@ export function useGestorDirectory({ isAdmin, isManager, managerSchoolId }: UseG
           await createAdminUser({
             full_name: userForm.full_name.trim(),
             email: userForm.email.trim(),
-            password: trimmedPassword,
+            password,
             role,
             school_id: schoolId,
             classroom_id: role === 'aluno' ? classroomId : undefined,

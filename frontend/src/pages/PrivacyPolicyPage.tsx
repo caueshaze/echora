@@ -16,6 +16,7 @@ const dataInventory = [
       'Mensagens enviadas e recebidas armazenadas sob criptografia AES-256-GCM.',
       'Indicadores automáticos de sentimento e sinalização preventiva de risco.',
       'Registro de encaminhamento e conclusão de alertas pela coordenação.',
+      'Quando a síntese por IA é solicitada, trechos dos relatos são enviados ao provedor de IA configurado, que pode processá-los fora do Brasil.',
     ],
   },
   {

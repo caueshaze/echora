@@ -86,7 +86,7 @@ export default function Aluno() {
               tips={[
                 'Seja específico ao comentar sobre aulas ou atividades.',
                 'Acompanhe respostas da coordenação e professores em Recebidos.',
-                'Seus relatos são protegidos com criptografia de ponta a ponta.',
+                'Seus relatos são protegidos por criptografia em trânsito e em repouso.',
               ]}
               actions={[
                 {

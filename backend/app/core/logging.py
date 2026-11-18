@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
+import os
 from logging.config import dictConfig
 from pathlib import Path
 from time import perf_counter
@@ -13,10 +15,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .config import Settings
 
 
+class SecureTimedRotatingFileHandler(logging.handlers.TimedRotatingFileHandler):
+    def _open(self):
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.baseFilename, flags, 0o600)
+        os.fchmod(descriptor, 0o600)
+        return os.fdopen(descriptor, self.mode, encoding=self.encoding, errors=self.errors)
+
+
 def setup_logging(settings: Settings) -> None:
     """Configure console + rotating file handlers."""
     log_dir = Path(settings.log_dir)
-    log_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    log_dir.chmod(0o700)
     log_level = "DEBUG" if settings.debug else "INFO"
     dictConfig(
         {
@@ -37,7 +48,7 @@ def setup_logging(settings: Settings) -> None:
                     "level": log_level,
                 },
                 "app_file": {
-                    "class": "logging.handlers.TimedRotatingFileHandler",
+                    "()": SecureTimedRotatingFileHandler,
                     "formatter": "default",
                     "level": log_level,
                     "filename": str(log_dir / "app.log"),
@@ -45,7 +56,7 @@ def setup_logging(settings: Settings) -> None:
                     "backupCount": 14,
                 },
                 "errors_file": {
-                    "class": "logging.handlers.TimedRotatingFileHandler",
+                    "()": SecureTimedRotatingFileHandler,
                     "formatter": "default",
                     "level": "ERROR",
                     "filename": str(log_dir / "errors.log"),

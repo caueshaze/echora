@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from sqlalchemy import Integer, and_, cast, exists, or_, select
+from sqlalchemy import String, and_, cast, exists, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ...core.crypto import decrypt_feedback
@@ -49,7 +49,7 @@ def _serialize_feedback(
         and str(viewer.id) == str(feedback.sender_id)
     )
 
-    decrypted = decrypt_feedback(feedback.content_encrypted, feedback.nonce)
+    decrypted = decrypt_feedback(feedback)
     resolved_sender = (
         sender_name
         or getattr(getattr(feedback, "sender", None), "full_name", None)
@@ -145,6 +145,8 @@ def _resolve_class_target(db: Session, target_id: str | int) -> Classroom:
             detail="Turma não encontrada",
         )
     return classroom
+
+
 
 
 def _assert_subject_permission(
@@ -413,13 +415,13 @@ def _school_scope_clause(
     """Build a SQL clause ensuring sender or target belongs to the school."""
     subject_belongs = exists(
         select(Subject.id).where(
-            Subject.id == cast(Feedback.target_id, Integer),
+            cast(Subject.id, String) == Feedback.target_id,
             Subject.school_id == school_id,
         )
     )
     classroom_belongs = exists(
         select(Classroom.id).where(
-            Classroom.id == cast(Feedback.target_id, Integer),
+            cast(Classroom.id, String) == Feedback.target_id,
             Classroom.school_id == school_id,
         )
     )

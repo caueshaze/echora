@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class FeedbackCreate(BaseModel):
     target_type: Literal["user", "class", "subject"]
     target_id: Union[str, int] = Field(..., description="Identificador do destino")
-    content: str = Field(..., min_length=1, description="Conteúdo em texto puro")
+    content: str = Field(..., min_length=1, max_length=4000, description="Conteúdo em texto puro")
     is_anonymous: bool = Field(
         default=False,
         description="Oculta a autoria para não-administradores (exclusivo para alunos)",

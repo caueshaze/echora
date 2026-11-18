@@ -34,7 +34,7 @@ export default function Login() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     const normalizedEmail = formData.username.trim().toLowerCase()
-    const normalizedPassword = formData.password.trim()
+    const normalizedPassword = formData.password
     if (!normalizedEmail || !normalizedPassword) {
       setStatusMessage({ type: 'error', text: 'Informe seu e-mail e sua senha.' })
       return
@@ -216,7 +216,7 @@ export default function Login() {
               <div>
                 <p className="text-sm font-semibold text-white">Sigilo e proteção de dados</p>
                 <p className="text-xs text-teal-100/80 mt-0.5 leading-relaxed">
-                  Mensagens protegidas com criptografia de ponta a ponta desde o envio.
+                  Mensagens protegidas por criptografia em trânsito e em repouso.
                 </p>
               </div>
             </div>

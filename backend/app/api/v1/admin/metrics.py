@@ -111,7 +111,8 @@ def get_admin_metrics_health(
     api_latency_ms = (datetime.utcnow() - start_total).total_seconds() * 1000
 
     onnx_latency_ms = _measure_onnx_latency()
-    gemma_latency_ms = llm.measure_llm_latency()
+    # Health checks never generate paid model requests.
+    gemma_latency_ms = None
 
     return AdminHealthMetrics(
         timestamp=datetime.utcnow(),

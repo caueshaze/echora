@@ -289,6 +289,7 @@ def _remote_sentiment(text: str) -> Tuple[Optional[str], Optional[float]]:
         return get_sentiment_analyzer().predict(text)
 
     try:
+        settings.validate_integration_url("SENTIMENT_API_URL", url)
         LOGGER.info("Chamando servidor remoto de sentimento em %s", url)
 
         resp = httpx.post(
@@ -296,6 +297,7 @@ def _remote_sentiment(text: str) -> Tuple[Optional[str], Optional[float]]:
             json={"text": text},
             headers={"X-API-Key": key} if key else {},
             timeout=5.0,
+            follow_redirects=False,
         )
         resp.raise_for_status()
         data = resp.json()

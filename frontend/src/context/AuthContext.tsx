@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { API_BASE_URL } from '../lib/config'
-import { clearToken, fetchCurrentUser, getToken, saveToken } from '../lib/auth'
+import { clearToken, fetchCurrentUser, getToken, saveToken, logoutSession } from '../lib/auth'
 
 export type Role = 'aluno' | 'professor' | 'gestor' | 'admin'
 type BackendRole = 'admin' | 'gestor' | 'professor' | 'aluno'
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       const normalizedEmail = email.trim().toLowerCase()
-      const normalizedPassword = password.trim()
+      const normalizedPassword = password
       if (!normalizedEmail || !normalizedPassword) {
         throw new Error('Informe usuário e senha para continuar.')
       }
@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -142,7 +143,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refresh]
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await logoutSession()
+    } catch {
+      window.alert('Não foi possível encerrar a sessão no servidor. Tente novamente.')
+      return
+    }
     clearToken()
     setSession(null)
   }, [])

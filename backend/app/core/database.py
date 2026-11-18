@@ -45,7 +45,8 @@ def _build_engine(settings: Optional[Settings] = None) -> Engine:
         LOGGER.warning("Usando SQLite apenas para desenvolvimento e testes.")
     return create_engine(
         database_url,
-        echo=resolved_settings.debug,
+        echo=False,
+        hide_parameters=True,
         future=True,
         connect_args=connect_args,
         pool_pre_ping=True,
@@ -376,8 +377,9 @@ def _get_sessionmaker() -> sessionmaker[Session]:
     global SessionLocal, _engine
     if SessionLocal is None or _engine is None:
         _engine = _build_engine()
-        Base.metadata.create_all(bind=_engine)
-        _run_sqlite_migrations(_engine)
+        if _engine.dialect.name == "sqlite" and not get_settings().is_production:
+            Base.metadata.create_all(bind=_engine)
+            _run_sqlite_migrations(_engine)
         SessionLocal = sessionmaker(
             bind=_engine,
             autocommit=False,
@@ -421,4 +423,5 @@ def init_db() -> None:
     _get_sessionmaker()
     if _engine is None:
         raise RuntimeError("Database engine not initialized")
-    Base.metadata.create_all(bind=_engine)
+    if _engine.dialect.name != "sqlite" or get_settings().is_production:
+        raise RuntimeError("Use Alembic para preparar o banco de dados")

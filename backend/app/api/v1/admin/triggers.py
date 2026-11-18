@@ -69,7 +69,7 @@ def create_trigger_keyword(
         db.execute(
             select(TriggerKeyword).where(
                 TriggerKeyword.keyword == keyword_normalized,
-                TriggerKeyword.school_id.is_(resolved_school_id),
+                TriggerKeyword.school_id == resolved_school_id,
             )
         )
         .scalar_one_or_none()
