@@ -1,7 +1,5 @@
 """Access control, encrypted history, and transactional question quotas for Maya."""
 from __future__ import annotations
-import hashlib
-import hmac
 import json
 from datetime import datetime, time, timedelta, timezone
 from uuid import uuid4
@@ -13,6 +11,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..core.crypto import encrypt_maya_content, decrypt_maya_content
+from ..core.maya_idempotency import matches_digest, request_digest
 from ..core import llm
 from ..models import User
 from ..models.maya import MayaAnalysis, MayaConversation, MayaDailyQuota, MayaQuestion
@@ -123,12 +122,15 @@ def messages(db: Session, user: UserPublic, analysis_id: str):
 
 
 def ask(db: Session, user: UserPublic, analysis_id: str, question: str, request_key: str):
+    from .maya_hmac_control import check_maya_compatibility
+    try:
+        check_maya_compatibility(db, get_settings())
+    except Exception:
+        raise HTTPException(503, 'Serviço da Maya indisponível') from None
     analysis = get_analysis(db, user, analysis_id)
     if (get_settings().summary_provider or 'openai').lower() not in ('openai', 'chatgpt'):
         raise HTTPException(503, 'Chat da Maya indisponível')
-    digest = hmac.new(get_settings().encryption_key_bytes(),
-                      b'maya-question-v1:' + json.dumps([analysis_id, question], ensure_ascii=False).encode(),
-                      hashlib.sha256).hexdigest()
+    settings = get_settings()
     day = current_day()
     quota = _lock_quota(db, user.id, day)
     # Release abandoned reservations after the provider's bounded timeout.
@@ -139,7 +141,12 @@ def ask(db: Session, user: UserPublic, analysis_id: str, question: str, request_
         _release_stale(db, user.id, existing.quota_date, previous_quota)
         db.flush()
     if existing:
-        if existing.request_digest != digest:
+        try:
+            matches = matches_digest(settings, analysis_id, question, existing.request_digest_version, existing.request_digest)
+        except ValueError:
+            db.rollback()
+            raise HTTPException(503, 'Não foi possível verificar a solicitação') from None
+        if not matches:
             db.rollback()
             raise HTTPException(409, 'Identificador já usado para outra pergunta')
         if existing.status == 'completed':
@@ -166,9 +173,11 @@ def ask(db: Session, user: UserPublic, analysis_id: str, question: str, request_
     if len(report) > 12000:
         report = report[:12000]
     question_id = existing.id if existing else str(uuid4())
+    digest_version = existing.request_digest_version if existing else settings.maya_idempotency_write_version
+    digest = request_digest(settings, analysis_id, question, digest_version)
     encrypted, nonce = encrypt_maya_content(question, kind='question', record_id=question_id)
     row = existing or MayaQuestion(id=question_id, conversation_id=conversation.id, user_id=user.id,
-                                   request_key=request_key, request_digest=digest)
+                                   request_key=request_key, request_digest=digest, request_digest_version=digest_version)
     row.question_encrypted, row.question_nonce = encrypted, nonce
     reservation_id = str(uuid4())
     row.status, row.quota_date, row.created_at, row.reservation_id = 'pending', day, datetime.now(timezone.utc), reservation_id

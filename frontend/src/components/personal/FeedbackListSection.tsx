@@ -1,5 +1,6 @@
 import { EyeOff, Flag, Inbox, RefreshCw } from 'lucide-react'
 import { FeedbackCard } from '../feedback/FeedbackCard'
+import { FeedbackSkeletonList } from '../feedback/FeedbackSkeletonList'
 import type { FeedbackPublic } from '../../lib/types'
 import type { SentimentFilter } from '../../hooks/usePersonalFeedbacks'
 
@@ -113,9 +114,7 @@ export function FeedbackListSection({
         </p>
       )}
 
-      {loading && (
-        <div className="py-10 text-center text-sm text-slate-500">Carregando registros...</div>
-      )}
+      {loading && <FeedbackSkeletonList label="Carregando registros..." />}
 
       {!loading && infoMessage && (
         <div className="py-8 text-center text-sm text-slate-500">{infoMessage}</div>

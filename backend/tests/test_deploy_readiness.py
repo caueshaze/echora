@@ -13,7 +13,8 @@ class DeployReadinessTests(unittest.TestCase):
             app = create_app()
         session_factory = MagicMock()
         redis_client = MagicMock()
-        with patch('backend.app.main._get_sessionmaker', return_value=session_factory), \
+        with patch('backend.app.main.check_maya_compatibility'), \
+             patch('backend.app.main._get_sessionmaker', return_value=session_factory), \
              patch('backend.app.main.redis.Redis.from_url', return_value=redis_client):
             response = TestClient(app).get('/health/ready')
         self.assertEqual(response.status_code, 200)

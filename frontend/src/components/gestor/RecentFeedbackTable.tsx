@@ -1,5 +1,6 @@
 import { ArrowRight, EyeOff, Inbox, RefreshCw, Trash2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { FeedbackSkeletonList } from '../feedback/FeedbackSkeletonList'
 import type { FeedbackPublic } from '../../lib/types'
 
 type RecentFeedbackTableProps = {
@@ -106,9 +107,7 @@ export function RecentFeedbackTable({
 
       {message && !loading && <p className="text-sm text-slate-500">{message}</p>}
 
-      {loading && (
-        <div className="py-10 text-center text-sm text-slate-500">Carregando registros...</div>
-      )}
+      {loading && <FeedbackSkeletonList label="Carregando registros..." />}
 
       {!loading && feedbacks.length === 0 && !message && (
         <div className="py-10 flex flex-col items-center justify-center text-center gap-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/40">

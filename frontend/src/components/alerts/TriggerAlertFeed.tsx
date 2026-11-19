@@ -1,5 +1,6 @@
 import { CheckCircle2, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
 import { FeedbackCard } from '../feedback/FeedbackCard'
+import { FeedbackSkeletonList } from '../feedback/FeedbackSkeletonList'
 import type { FeedbackPublic } from '../../lib/types'
 
 type TriggerAlertFeedProps = {
@@ -53,7 +54,7 @@ export function TriggerAlertFeed({
         )}
       </div>
 
-      {loading && <p className="text-sm text-slate-500 py-4">Verificando ocorrências...</p>}
+      {loading && <FeedbackSkeletonList label="Verificando ocorrências..." />}
 
       {statusMessage && (
         <p className="text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">

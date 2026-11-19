@@ -35,7 +35,7 @@ export function PersonalSummaryCard({
           onClick={onGenerate}
           disabled={summaryLoading}
         >
-          <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+          <Sparkles className={`h-4 w-4 ${summaryLoading ? 'animate-pulse' : ''}`} strokeWidth={1.75} />
           {summaryLoading ? 'Analisando relatos...' : 'Gerar síntese'}
         </button>
       </div>
@@ -47,7 +47,7 @@ export function PersonalSummaryCard({
       )}
 
       {summary && (
-        <div className="space-y-4 pt-2 border-t border-slate-100">
+        <div className="space-y-4 pt-2 border-t border-slate-100 animate-fadeUp">
           <div className="rounded-xl bg-brand-50/50 border border-brand-100 p-4 text-sm leading-relaxed text-slate-800 whitespace-pre-line">
             {summary.summary_text}
           </div>

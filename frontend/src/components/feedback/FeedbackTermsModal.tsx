@@ -9,13 +9,18 @@ interface FeedbackTermsModalProps {
 export function FeedbackTermsModal({ open, onClose }: FeedbackTermsModalProps) {
   useEffect(() => {
     if (!open) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -29,12 +34,12 @@ export function FeedbackTermsModal({ open, onClose }: FeedbackTermsModalProps) {
     >
       <button
         type="button"
-        className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px]"
+        className="fixed inset-0 bg-slate-900/45 dark:bg-slate-950/70 backdrop-blur-[1px] animate-fadeIn"
         onClick={onClose}
         aria-label="Fechar termos de uso"
       />
 
-      <div className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-elevated border border-slate-200 max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="relative z-10 w-full sm:max-w-lg bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-elevated border border-slate-200 dark:border-slate-800 max-h-[88vh] flex flex-col overflow-hidden animate-slideUpModal">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-700">

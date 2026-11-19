@@ -18,7 +18,7 @@ class PostgreSQLGrantsTests(unittest.TestCase):
             'auth_sessions': 'SIU', 'audit_events': 'I', 'admin_operations': 'SI',
             'reveal_permissions': 'S', 'reveal_requests': 'SIU',
             'maya_analyses': 'SI', 'maya_conversations': 'SI',
-            'maya_questions': 'SIU', 'maya_daily_quotas': 'SIU',
+            'maya_hmac_control': 'S', 'maya_questions': 'SIU', 'maya_daily_quotas': 'SIU',
         }
         script = (Path(__file__).resolve().parents[2] / 'deploy/postgres-grants.sql').read_text().replace('\\set ON_ERROR_STOP on', '')
         table = 'test_unknown_' + uuid4().hex

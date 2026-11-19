@@ -4,6 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 
 import { useAuth, Role } from '../context/AuthContext'
 import { hasToken } from '../lib/auth'
+import { EchoraLogo } from './brand/EchoraLogo'
 
 type BackendRole = 'admin' | 'gestor' | 'professor' | 'aluno'
 type AllowedRole = Role | BackendRole
@@ -51,8 +52,16 @@ export function Protected({ children, roles, allow }: ProtectedProps) {
 
   if (loading && !session) {
     return (
-      <div className="min-h-screen grid place-items-center text-slate-500 text-sm">
-        Validando sessão...
+      <div className="min-h-screen bg-[#F6F8FA] dark:bg-[#0B1120] grid place-items-center px-4">
+        <div className="flex flex-col items-center gap-4 animate-fadeUp">
+          <div className="animate-pulse">
+            <EchoraLogo size="lg" />
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-600 animate-ping" />
+            <span>Validando sessão...</span>
+          </div>
+        </div>
       </div>
     )
   }

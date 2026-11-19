@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { FeedbackCard } from '../feedback/FeedbackCard'
 import type { FeedbackPublic } from '../../lib/types'
@@ -23,19 +24,35 @@ export function UserProfileDrawer({
   sentFeedbacks,
   receivedFeedbacks,
 }: UserProfileDrawerProps) {
+  useEffect(() => {
+    if (!profile) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [profile, onClose])
+
   if (!profile) return null
 
   const roleLabel = profile.role ? ROLE_LABELS[profile.role] || profile.role : 'Usuário'
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
       <button
         type="button"
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+        className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-[1px] animate-fadeIn"
         onClick={onClose}
         aria-label="Fechar histórico do usuário"
       />
-      <div className="relative z-10 w-full max-w-md bg-white shadow-elevated h-full overflow-y-auto p-5 sm:p-6 space-y-6">
+      <div className="relative z-10 w-full max-w-md bg-white dark:bg-slate-900 shadow-elevated h-full overflow-y-auto p-5 sm:p-6 space-y-6 animate-slideInRight">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div className="min-w-0">
             <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-800 mb-1">

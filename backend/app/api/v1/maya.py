@@ -11,7 +11,9 @@ from ...models.maya import MayaAnalysis
 from ...schemas.user import UserPublic
 from ...services import maya_service as service
 
-router = APIRouter(prefix='/maya', tags=['Maya'])
+from ...services.maya_hmac_control import require_maya_compatibility
+
+router = APIRouter(prefix='/maya', tags=['Maya'], dependencies=[Depends(require_maya_compatibility)])
 
 
 class QuestionInput(BaseModel):

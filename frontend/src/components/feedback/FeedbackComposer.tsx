@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, EyeOff, Search, Send } from 'lucide-react'
+import { Check, CheckCircle2, EyeOff, Search, Send } from 'lucide-react'
 
 import {
   createFeedback,
@@ -289,13 +289,23 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
                       setRecipientSearch('')
                       setStatus(null)
                     }}
-                    className={`px-3.5 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors ${
+                    className={`flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border text-sm font-medium text-left transition-all duration-150 ${
                       selected
-                        ? 'border-brand-600 bg-brand-50/70 text-brand-900 ring-1 ring-brand-600/20'
+                        ? 'border-brand-600 dark:border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-600/20'
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {TARGET_TYPE_LABELS[type]}
+                    <span>{TARGET_TYPE_LABELS[type]}</span>
+                    <span
+                      className={`h-4 w-4 rounded-full grid place-items-center shrink-0 transition-colors ${
+                        selected
+                          ? 'bg-brand-600 text-white'
+                          : 'border border-slate-300 dark:border-slate-600'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {selected && <Check className="h-2.5 w-2.5" strokeWidth={2.5} />}
+                    </span>
                   </button>
                 )
               })}
@@ -303,7 +313,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
           </div>
 
           {isUserTarget && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fadeUp">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label" htmlFor="composer-role">
@@ -433,7 +443,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
           )}
 
           {isSubjectTarget && (
-            <div>
+            <div className="animate-fadeUp">
               <label className="label" htmlFor="composer-subject">
                 Qual matéria?
               </label>
@@ -462,7 +472,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
           )}
 
           {isClassTarget && (
-            <div>
+            <div className="animate-fadeUp">
               <label className="label" htmlFor="composer-class">
                 Qual turma?
               </label>
@@ -491,9 +501,14 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
           )}
 
           <div>
-            <label className="label" htmlFor="composer-content">
-              Mensagem
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="label mb-0" htmlFor="composer-content">
+                Mensagem
+              </label>
+              <span className="text-[11px] text-slate-400 tabular-nums">
+                {form.content.length} caracteres
+              </span>
+            </div>
             <textarea
               id="composer-content"
               className="input min-h-[120px] resize-y"
@@ -546,7 +561,7 @@ export function FeedbackComposer({ title, helperText, onSuccess }: FeedbackCompo
               >
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-white shadow-xs transition-transform ${
                     form.is_anonymous ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />

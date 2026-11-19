@@ -107,6 +107,8 @@ class Settings(BaseSettings):
     )
     summary_admin_requests_per_hour: int = Field(default=3, ge=1)
     maya_daily_question_limit: int = Field(default=5, ge=1)
+    maya_idempotency_hmac_key: str = Field(default='', repr=False, exclude=True)
+    maya_idempotency_write_version: Literal['legacy-v1', 'hmac-v2'] = 'legacy-v1'
     # Limits include both reasoning and visible output tokens.
     summary_openai_max_completion_tokens: int = Field(default=512, ge=1)
     summary_openai_retry_max_completion_tokens: int = Field(default=1024, ge=1)
@@ -141,6 +143,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
+        if self.maya_idempotency_hmac_key or self.maya_idempotency_write_version == 'hmac-v2' or self.is_production:
+            self._validate_idempotency_key_independence()
         if not self.is_production:
             return self
         if self.debug:
@@ -220,6 +224,38 @@ class Settings(BaseSettings):
                 re.search(r"change.?me|insecure|substitua|placeholder|example", raw, re.I)):
             raise ValueError("DATA_ENCRYPTION_KEY deve ser uma chave aleatória de 32 bytes em Base64")
         return key
+
+    def idempotency_hmac_key_bytes(self) -> bytes:
+        """Dedicated, explicitly configured HMAC key; never include its value in errors."""
+        try:
+            key = base64.b64decode(self.maya_idempotency_hmac_key, altchars=b'-_', validate=True)
+            if len(key) != 32 or len(set(key)) < 16:
+                raise ValueError
+            return key
+        except (ValueError, TypeError, binascii.Error, UnicodeError):
+            raise ValueError('MAYA_IDEMPOTENCY_HMAC_KEY deve ser uma chave Base64 independente de 32 bytes') from None
+
+    def _validate_idempotency_key_independence(self) -> None:
+        try:
+            key = self.idempotency_hmac_key_bytes()
+            from .crypto import _keys
+            _, aes_keys = _keys(self)
+            if key in aes_keys.values():
+                raise ValueError
+            secret = self.secret_key.strip()
+            candidates = [secret.encode('utf-8')]
+            try:
+                candidates.append(bytes.fromhex(secret))
+            except ValueError:
+                pass
+            try:
+                candidates.append(base64.b64decode(secret, altchars=b'-_', validate=True))
+            except (ValueError, binascii.Error):
+                pass
+            if key in candidates:
+                raise ValueError
+        except (ValueError, TypeError, binascii.Error, UnicodeError):
+            raise ValueError('MAYA_IDEMPOTENCY_HMAC_KEY deve ser uma chave Base64 independente de 32 bytes') from None
 
     # ===== HELPERS =====
 

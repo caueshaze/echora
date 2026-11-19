@@ -24,6 +24,7 @@ import {
   type SubjectFormState,
   type UserFormState,
 } from '../hooks/useGestorDirectory'
+import { ActionModal } from '../components/layout/ActionModal'
 import { AppShell, type NavItem } from '../components/layout/AppShell'
 import { GestorOverviewSection } from '../components/gestor/GestorOverviewSection'
 import { FeedbackComposer } from '../components/feedback/FeedbackComposer'
@@ -159,6 +160,10 @@ export default function Gestor() {
   const [directoryInitialized, setDirectoryInitialized] = useState(false)
   const [feedbackActionStatus, setFeedbackActionStatus] = useState<string | null>(null)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [pendingDeleteFeedbackId, setPendingDeleteFeedbackId] = useState<number | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [resolvingFeedback, setResolvingFeedback] = useState<FeedbackPublic | null>(null)
+  const [resolveBusy, setResolveBusy] = useState(false)
 
   const triggerAlerts = useTriggerAlerts(
     isAdmin ? {} : { schoolId: managerSchoolId ?? undefined },
@@ -292,22 +297,27 @@ export default function Gestor() {
     [activeSection, roleFilterSetter],
   )
 
-  const handleDeleteSingleFeedback = useCallback(
-    async (feedbackId: number) => {
-      if (!window.confirm('Deseja excluir permanentemente este registro?')) return
-      setFeedbackActionStatus('Removendo registro...')
-      try {
-        await deleteFeedback(feedbackId)
-        setFeedbackActionStatus('Registro removido com sucesso.')
-        await loadFeedbacks()
-        await triggerAlerts.loadAlerts()
-        await resolvedAlerts.loadAlerts()
-      } catch (error: any) {
-        setFeedbackActionStatus(error?.message || 'Não foi possível remover o registro.')
-      }
-    },
-    [loadFeedbacks, triggerAlerts, resolvedAlerts],
-  )
+  const handleDeleteSingleFeedback = useCallback((feedbackId: number) => {
+    setPendingDeleteFeedbackId(feedbackId)
+  }, [])
+
+  const handleConfirmDeleteFeedback = useCallback(async () => {
+    if (pendingDeleteFeedbackId === null) return
+    setDeleteBusy(true)
+    setFeedbackActionStatus('Removendo registro...')
+    try {
+      await deleteFeedback(pendingDeleteFeedbackId)
+      setFeedbackActionStatus('Registro removido com sucesso.')
+      setPendingDeleteFeedbackId(null)
+      await loadFeedbacks()
+      await triggerAlerts.loadAlerts()
+      await resolvedAlerts.loadAlerts()
+    } catch (error: any) {
+      setFeedbackActionStatus(error?.message || 'Não foi possível remover o registro.')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [pendingDeleteFeedbackId, loadFeedbacks, triggerAlerts, resolvedAlerts])
 
   const handleOpenProfile = useCallback((userId: string) => {
     setSelectedUserId(userId)
@@ -317,16 +327,23 @@ export default function Gestor() {
     setSelectedUserId(null)
   }, [])
 
-  const handleResolveAlert = useCallback(
-    (feedback: FeedbackPublic) => {
-      const note = window.prompt('Registrar observação de encaminhamento (opcional):')
-      if (note === null) return
-      void (async () => {
-        await triggerAlerts.resolveAlert(feedback.id, note || undefined)
+  const handleResolveAlert = useCallback((feedback: FeedbackPublic) => {
+    setResolvingFeedback(feedback)
+  }, [])
+
+  const handleConfirmResolveAlert = useCallback(
+    async (note: string) => {
+      if (!resolvingFeedback) return
+      setResolveBusy(true)
+      try {
+        await triggerAlerts.resolveAlert(resolvingFeedback.id, note || undefined)
+        setResolvingFeedback(null)
         await resolvedAlerts.loadAlerts()
-      })()
+      } finally {
+        setResolveBusy(false)
+      }
     },
-    [triggerAlerts, resolvedAlerts],
+    [resolvingFeedback, triggerAlerts, resolvedAlerts],
   )
 
   const renderSection = () => {
@@ -711,6 +728,32 @@ export default function Gestor() {
           receivedFeedbacks={selectedProfileReceived}
         />
       )}
+
+      <ActionModal
+        open={pendingDeleteFeedbackId !== null}
+        mode="confirm"
+        tone="danger"
+        title="Excluir registro"
+        description="Deseja excluir permanentemente este relato? Esta ação não pode ser desfeita."
+        confirmLabel="Excluir registro"
+        loading={deleteBusy}
+        onConfirm={handleConfirmDeleteFeedback}
+        onClose={() => setPendingDeleteFeedbackId(null)}
+      />
+
+      <ActionModal
+        open={Boolean(resolvingFeedback)}
+        mode="prompt"
+        title="Concluir atendimento"
+        description="Registre uma observação de acompanhamento para o histórico desta ocorrência (opcional)."
+        inputLabel="Observação de encaminhamento"
+        inputPlaceholder="Ex.: Conversa realizada com a família e orientação registrada..."
+        optional
+        confirmLabel="Concluir atendimento"
+        loading={resolveBusy}
+        onConfirm={handleConfirmResolveAlert}
+        onClose={() => setResolvingFeedback(null)}
+      />
     </>
   )
 }

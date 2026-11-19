@@ -21,6 +21,7 @@ class ProductionSettingsTests(unittest.TestCase):
             'rate_limit_storage_uri': 'redis://localhost:6379/0',
             'secret_key': 'd1b3f29c80a4e75d947d670c5be839a23f91ca3e5b22a61f1cd8b9e05841ef72',
             'data_encryption_key': base64.b64encode(self.key).decode(),
+            'maya_idempotency_hmac_key': base64.b64encode(bytes(range(32, 64))).decode(),
         }
 
     def settings(self, **overrides):
@@ -70,6 +71,7 @@ class ProductionSettingsTests(unittest.TestCase):
                 'RATE_LIMIT_STORAGE_URI=' + self.values['rate_limit_storage_uri'],
                 'SECRET_KEY=' + self.values['secret_key'],
                 'DATA_ENCRYPTION_KEY=' + self.values['data_encryption_key'],
+                'MAYA_IDEMPOTENCY_HMAC_KEY=' + self.values['maya_idempotency_hmac_key'],
                 'PROJECT_NAME=from-file',
             ]))
             with patch.object(config, 'PROJECT_ROOT', root), patch.dict(os.environ, {'APP_ENV': 'production', 'PROJECT_NAME': 'from-env'}, clear=True):

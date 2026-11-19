@@ -80,6 +80,12 @@ frontend/.env.*
 # Documentação: manter somente o README principal versionado
 *.md
 !/README.md
+*.markdown
+*.mdown
+*.rst
+docs/
+deploy/OPERACAO.txt
+migrations/README
 
 # === LOCKFILES (opcional) ===
 # descomente se quiser evitar travar dependências

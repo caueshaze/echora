@@ -84,7 +84,8 @@ class AuthenticationSessionTests(unittest.TestCase):
         settings = Settings(_env_file=None, app_env='production', database_url='postgresql://localhost/db',
                             rate_limit_storage_uri='redis://localhost:6379/0',
                             secret_key='0123456789abcdef' * 4,
-                            data_encryption_key=base64.b64encode(bytes(range(32))).decode())
+                            data_encryption_key=base64.b64encode(bytes(range(32))).decode(),
+                            maya_idempotency_hmac_key=base64.b64encode(bytes(range(32, 64))).decode())
         deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
         session = AuthSession(id='test-session', user_id=self.user.id, refresh_hash='x', expires_at=deadline)
         response = _response(self.user, session, 'secret', settings)

@@ -46,7 +46,7 @@ GRANT SELECT ON TABLE public.alembic_version, public.schools, public.classrooms,
   public.feedbacks, public.teacher_assignments, public.teacher_subjects,
   public.auth_sessions, public.admin_operations,
   public.reveal_permissions, public.reveal_requests, public.maya_analyses,
-  public.maya_conversations, public.maya_questions, public.maya_daily_quotas TO echora_app;
+  public.maya_conversations, public.maya_questions, public.maya_daily_quotas, public.maya_hmac_control TO echora_app;
 -- INSERT RETURNING do ORM precisa somente destas colunas de auditoria.
 GRANT SELECT (id, created_at) ON TABLE public.audit_events TO echora_app;
 

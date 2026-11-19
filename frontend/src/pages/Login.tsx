@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Eye, EyeOff, Lock, Users } from 'lucide-react'
 
 import { EchoraLogo } from '../components/brand/EchoraLogo'
+import { ThemeToggle } from '../components/layout/ThemeToggle'
 import { useAuth, Role } from '../context/AuthContext'
 import { API_BASE_URL } from '../lib/config'
 import { clearToken, getToken } from '../lib/auth'
@@ -87,14 +88,21 @@ export default function Login() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F8FAFC] lg:bg-transparent flex flex-col lg:grid lg:grid-cols-12">
+    <div className="relative min-h-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#0B1120] lg:bg-transparent lg:dark:bg-transparent flex flex-col lg:grid lg:grid-cols-12">
       {/* Desktop Soft Blended Background between Light and Deep Teal */}
       <div className="hidden lg:block absolute inset-0 pointer-events-none" aria-hidden="true">
         <div
-          className="absolute -inset-36 blur-[72px]"
+          className="dark:hidden absolute -inset-36 blur-[72px]"
           style={{
             background:
               'linear-gradient(96deg, #FFFFFF 0%, #FFFFFF 45%, #0F544F 53%, #0B3E3B 75%, #082F2C 100%)',
+          }}
+        />
+        <div
+          className="hidden dark:block absolute -inset-36 blur-[72px]"
+          style={{
+            background:
+              'linear-gradient(96deg, #0B1120 0%, #0B1120 45%, #072C29 53%, #052220 75%, #031816 100%)',
           }}
         />
       </div>
@@ -106,10 +114,11 @@ export default function Login() {
           <Link to="/" className="inline-flex items-center group" title="Ir para o início">
             <EchoraLogo size="md" />
           </Link>
+          <ThemeToggle compact />
         </header>
 
         {/* Centered Login Card / Form */}
-        <main className="w-full max-w-sm mx-auto my-auto py-8 space-y-6">
+        <main className="w-full max-w-sm mx-auto my-auto py-8 space-y-6 animate-fadeUp">
           <div className="space-y-1.5">
             <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
               Acesse sua conta

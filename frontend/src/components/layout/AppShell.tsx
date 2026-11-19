@@ -3,6 +3,7 @@ import { LogOut, Menu, RefreshCw, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { EchoraLogo } from '../brand/EchoraLogo'
+import { ThemeToggle } from './ThemeToggle'
 
 export type NavItem<T extends string> = {
   id: T
@@ -54,6 +55,22 @@ export function AppShell<T extends string>({
     setDrawerOpen(false)
   }, [activeId])
 
+  useEffect(() => {
+    if (!drawerOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDrawerOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [drawerOpen])
+
   const groupedItems = groupNavItems(items)
   const bottomItems = bottomNavIds
     ? bottomNavIds
@@ -68,12 +85,15 @@ export function AppShell<T extends string>({
   return (
     <div className="min-h-screen bg-[#F6F8FA] text-slate-900 flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200/80 z-30">
-        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100">
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 z-30">
+        <div className="h-16 px-5 flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800">
           <EchoraLogo size="md" />
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-            {roleLabel}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              {roleLabel}
+            </span>
+            <ThemeToggle compact className="border-transparent bg-transparent dark:bg-transparent" />
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
@@ -93,16 +113,22 @@ export function AppShell<T extends string>({
                       <button
                         type="button"
                         onClick={() => onSelect(item.id)}
-                        className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        className={`relative group w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                           isActive
-                            ? 'bg-brand-50 text-brand-800 font-semibold'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                            ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-800 dark:text-brand-300 font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-slate-100 font-medium'
                         }`}
                       >
+                        {isActive && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-brand-600 dark:bg-brand-400"
+                          />
+                        )}
                         <span className="flex items-center gap-2.5 truncate">
                           <Icon
-                            className={`h-4 w-4 shrink-0 ${
-                              isActive ? 'text-brand-700' : 'text-slate-400'
+                            className={`h-4 w-4 shrink-0 transition-transform duration-150 group-hover:scale-105 ${
+                              isActive ? 'text-brand-700 dark:text-brand-400' : 'text-slate-400'
                             }`}
                             strokeWidth={isActive ? 2 : 1.75}
                           />
@@ -110,10 +136,10 @@ export function AppShell<T extends string>({
                         </span>
                         {typeof item.badge === 'number' && item.badge > 0 && (
                           <span
-                            className={`text-xs px-1.5 py-0.2 rounded-full font-medium tabular-nums ${
+                            className={`text-xs px-1.5 py-0.5 rounded-full font-medium tabular-nums ${
                               isActive
-                                ? 'bg-brand-700 text-white'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-brand-700 dark:bg-brand-600 text-white'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                             }`}
                           >
                             {item.badge}
@@ -170,6 +196,7 @@ export function AppShell<T extends string>({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <ThemeToggle compact className="border-transparent bg-transparent dark:bg-transparent" />
           {onRefresh && (
             <button
               type="button"
@@ -201,11 +228,11 @@ export function AppShell<T extends string>({
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <button
             type="button"
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+            className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-[1px] animate-fadeIn"
             aria-label="Fechar menu"
             onClick={() => setDrawerOpen(false)}
           />
-          <div className="relative w-72 max-w-[85vw] bg-white h-full shadow-elevated flex flex-col z-10">
+          <div className="relative w-72 max-w-[85vw] bg-white dark:bg-slate-900 h-full shadow-elevated flex flex-col z-10 animate-slideInLeft">
             <div className="h-14 px-4 flex items-center justify-between border-b border-slate-100">
               <EchoraLogo size="sm" subtitle={roleLabel} />
               <button
@@ -318,7 +345,9 @@ export function AppShell<T extends string>({
             </div>
           </div>
 
-          {children}
+          <div key={activeId} className="animate-fadeUp space-y-6">
+            {children}
+          </div>
         </main>
       </div>
 
@@ -326,7 +355,7 @@ export function AppShell<T extends string>({
       {hasBottomNav && (
         <nav
           aria-label="Navegação rápida"
-          className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200/80 pb-safe"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200/80 dark:border-slate-800 pb-safe"
         >
           <ul
             className="grid h-16 px-1"
@@ -342,14 +371,25 @@ export function AppShell<T extends string>({
                     onClick={() => onSelect(item.id)}
                     className={`relative flex-1 flex flex-col items-center justify-center gap-1 text-[11px] transition-colors ${
                       isActive
-                        ? 'text-brand-700 font-semibold'
-                        : 'text-slate-500 hover:text-slate-800 font-medium'
+                        ? 'text-brand-700 dark:text-brand-400 font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
                     }`}
                   >
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full bg-brand-600 dark:bg-brand-400"
+                      />
+                    )}
                     <span className="relative">
-                      <Icon className="h-5 w-5" strokeWidth={isActive ? 2.1 : 1.75} />
+                      <Icon
+                        className={`h-5 w-5 transition-transform duration-150 ${
+                          isActive ? 'scale-105' : ''
+                        }`}
+                        strokeWidth={isActive ? 2.1 : 1.75}
+                      />
                       {typeof item.badge === 'number' && item.badge > 0 && (
-                        <span className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 rounded-full bg-brand-700 text-white text-[10px] font-semibold grid place-items-center">
+                        <span className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 rounded-full bg-brand-700 dark:bg-brand-600 text-white text-[10px] font-semibold grid place-items-center">
                           {item.badge > 9 ? '9+' : item.badge}
                         </span>
                       )}

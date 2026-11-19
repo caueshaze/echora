@@ -11,9 +11,22 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('echora_theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (saved === 'dark' || (!saved && prefersDark)) {
+            document.documentElement.classList.add('dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#0B1120');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Echora — Escuta e Clima Escolar</title>
   </head>
-  <body class="bg-[#F6F8FA] text-slate-900 antialiased selection:bg-teal-100 selection:text-teal-900">
+  <body class="bg-[#F6F8FA] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 antialiased selection:bg-teal-100 selection:text-teal-900 dark:selection:bg-teal-900 dark:selection:text-teal-100 transition-colors duration-200">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

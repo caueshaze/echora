@@ -150,9 +150,9 @@ export default function LandingPage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                <Link to="/login" className="btn py-3 px-6 text-sm">
+                <Link to="/login" className="btn group py-3 px-6 text-sm">
                   Entrar na plataforma
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                 </Link>
                 <a href="#como-funciona" className="btn-secondary py-3 px-6 text-sm">
                   Ver como funciona
@@ -256,7 +256,10 @@ export default function LandingPage() {
             {STEPS.map((step) => {
               const Icon = step.icon
               return (
-                <article key={step.title} className="card p-6 space-y-3">
+                <article
+                  key={step.title}
+                  className="card p-6 space-y-3 hover:-translate-y-0.5 hover:shadow-elevated transition-all duration-200"
+                >
                   <span className="h-10 w-10 rounded-lg bg-brand-50 text-brand-700 grid place-items-center">
                     <Icon className="h-5 w-5" strokeWidth={1.75} />
                   </span>
@@ -305,7 +308,10 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/90 bg-[#F6F8FA] p-6 sm:p-8 lg:p-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
+            <div
+              key={activeRole}
+              className="animate-fadeUp rounded-2xl border border-slate-200/90 bg-[#F6F8FA] p-6 sm:p-8 lg:p-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center"
+            >
               <div className="space-y-4">
                 <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-brand-100/80 text-brand-900">
                   {currentRole.badge}
@@ -319,10 +325,11 @@ export default function LandingPage() {
               </div>
 
               <ul className="space-y-3">
-                {currentRole.bullets.map((bullet) => (
+                {currentRole.bullets.map((bullet, idx) => (
                   <li
                     key={bullet}
-                    className="flex items-start gap-3 rounded-xl bg-white border border-slate-200/80 p-4 text-sm text-slate-700 shadow-soft"
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                    className="animate-fadeUp flex items-start gap-3 rounded-xl bg-white border border-slate-200/80 p-4 text-sm text-slate-700 shadow-soft"
                   >
                     <CheckCircle2 className="h-4 w-4 text-brand-700 shrink-0 mt-0.5" />
                     <span>{bullet}</span>
@@ -396,6 +403,7 @@ export default function LandingPage() {
                 <div key={item.question} className="card overflow-hidden">
                   <button
                     type="button"
+                    aria-expanded={isOpen}
                     onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
                     className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
                   >
@@ -403,16 +411,22 @@ export default function LandingPage() {
                       {item.question}
                     </span>
                     <ChevronDown
-                      className={`h-4 w-4 text-slate-400 shrink-0 transition-transform ${
+                      className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
                         isOpen ? 'rotate-180 text-brand-700' : ''
                       }`}
                     />
                   </button>
-                  {isOpen && (
-                    <div className="px-5 pb-4 text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
-                      {item.answer}
+                  <div
+                    className={`grid transition-all duration-200 ease-out ${
+                      isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="px-5 pb-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
+                        {item.answer}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )
             })}

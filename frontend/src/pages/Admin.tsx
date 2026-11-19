@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, BarChart3, Building2, MessageSquare, Users } from 'lucide-react'
 
 import { useAuth } from '../context/AuthContext'
+import { ActionModal } from '../components/layout/ActionModal'
 import { AppShell, type NavItem } from '../components/layout/AppShell'
 import { useAdminMetrics } from '../hooks/useAdminMetrics'
 import { AdminMetricsGrid } from '../components/admin/AdminMetricsGrid'
@@ -52,6 +53,8 @@ export default function Admin() {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [directoryInitialized, setDirectoryInitialized] = useState(false)
   const [feedbackActionStatus, setFeedbackActionStatus] = useState<string | null>(null)
+  const [pendingDeleteFeedbackId, setPendingDeleteFeedbackId] = useState<number | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [userSchoolFilter, setUserSchoolFilter] = useState<string>('all')
   const [feedbackSchoolFilter, setFeedbackSchoolFilter] = useState<string>('all')
   const selectedFeedbackSchoolId =
@@ -91,20 +94,25 @@ export default function Admin() {
     return usersState.filteredUsers.filter((user) => (user.school_id ?? null) === schoolId)
   }, [usersState.filteredUsers, userSchoolFilter])
 
-  const handleDeleteSingleFeedback = useCallback(
-    async (feedbackId: number) => {
-      if (!window.confirm('Deseja excluir permanentemente este relato?')) return
-      setFeedbackActionStatus('Removendo relato...')
-      try {
-        await deleteFeedback(feedbackId)
-        setFeedbackActionStatus('Relato removido.')
-        await overview.loadFeedbacks()
-      } catch (error: any) {
-        setFeedbackActionStatus(error?.message || 'Não foi possível remover o relato.')
-      }
-    },
-    [overview],
-  )
+  const handleDeleteSingleFeedback = useCallback((feedbackId: number) => {
+    setPendingDeleteFeedbackId(feedbackId)
+  }, [])
+
+  const handleConfirmDeleteFeedback = useCallback(async () => {
+    if (pendingDeleteFeedbackId === null) return
+    setDeleteBusy(true)
+    setFeedbackActionStatus('Removendo relato...')
+    try {
+      await deleteFeedback(pendingDeleteFeedbackId)
+      setFeedbackActionStatus('Relato removido.')
+      setPendingDeleteFeedbackId(null)
+      await overview.loadFeedbacks()
+    } catch (error: any) {
+      setFeedbackActionStatus(error?.message || 'Não foi possível remover o relato.')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [pendingDeleteFeedbackId, overview])
 
   const renderSection = () => {
     switch (activeSection) {
@@ -229,27 +237,41 @@ export default function Admin() {
   const currentMeta = SECTION_META[activeSection]
 
   return (
-    <AppShell
-      userName={session?.fullName || 'Administrador'}
-      userEmail={session?.email}
-      roleLabel="Admin"
-      pageTitle={currentMeta.title}
-      pageSubtitle={currentMeta.subtitle}
-      items={NAV_ITEMS}
-      bottomNavIds={['overview', 'schools', 'users', 'feedbacks', 'health']}
-      activeId={activeSection}
-      onSelect={setActiveSection}
-      onLogout={logout}
-      onRefresh={adminMetrics.loadOverview}
-      refreshLoading={adminMetrics.overviewLoading}
-      refreshLabel="Atualizar painel"
-    >
-      {adminMetrics.error && (
-        <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
-          {adminMetrics.error}
-        </div>
-      )}
-      {renderSection()}
-    </AppShell>
+    <>
+      <AppShell
+        userName={session?.fullName || 'Administrador'}
+        userEmail={session?.email}
+        roleLabel="Admin"
+        pageTitle={currentMeta.title}
+        pageSubtitle={currentMeta.subtitle}
+        items={NAV_ITEMS}
+        bottomNavIds={['overview', 'schools', 'users', 'feedbacks', 'health']}
+        activeId={activeSection}
+        onSelect={setActiveSection}
+        onLogout={logout}
+        onRefresh={adminMetrics.loadOverview}
+        refreshLoading={adminMetrics.overviewLoading}
+        refreshLabel="Atualizar painel"
+      >
+        {adminMetrics.error && (
+          <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
+            {adminMetrics.error}
+          </div>
+        )}
+        {renderSection()}
+      </AppShell>
+
+      <ActionModal
+        open={pendingDeleteFeedbackId !== null}
+        mode="confirm"
+        tone="danger"
+        title="Excluir relato"
+        description="Deseja excluir permanentemente este relato? Esta ação não pode ser desfeita."
+        confirmLabel="Excluir relato"
+        loading={deleteBusy}
+        onConfirm={handleConfirmDeleteFeedback}
+        onClose={() => setPendingDeleteFeedbackId(null)}
+      />
+    </>
   )
 }

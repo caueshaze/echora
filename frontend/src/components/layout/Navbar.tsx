@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, Menu, X } from 'lucide-react'
 
 import { EchoraLogo } from '../brand/EchoraLogo'
+import { ThemeToggle } from './ThemeToggle'
 
 const navItems = [
   { label: 'Como funciona', target: 'como-funciona' },
@@ -59,26 +60,30 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
-          <Link to="/login" className="btn py-2 min-h-[38px] px-4">
+        <div className="hidden md:flex items-center gap-2.5">
+          <ThemeToggle />
+          <Link to="/login" className="btn group py-2 min-h-[38px] px-4">
             Entrar
-            <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+            <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.75} />
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="md:hidden p-2 -mr-2 rounded-lg text-slate-600 hover:bg-slate-100"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-label={open ? 'Fechar menu' : 'Abrir menu'}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="md:hidden flex items-center gap-1.5">
+          <ThemeToggle compact />
+          <button
+            type="button"
+            className="p-2 -mr-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => setOpen((prev) => !prev)}
+            aria-label={open ? 'Fechar menu' : 'Abrir menu'}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-2 shadow-elevated">
-          <nav className="flex flex-col divide-y divide-slate-100 text-sm font-medium text-slate-700">
+        <div className="md:hidden border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pb-5 pt-2 shadow-elevated animate-fadeUp">
+          <nav className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200">
             {navItems.map((item) => (
               <a
                 key={item.target}
@@ -93,11 +98,11 @@ export function Navbar() {
           <div className="pt-4">
             <Link
               to="/login"
-              className="btn w-full"
+              className="btn group w-full"
               onClick={() => setOpen(false)}
             >
               Acessar minha conta
-              <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+              <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.75} />
             </Link>
           </div>
         </div>

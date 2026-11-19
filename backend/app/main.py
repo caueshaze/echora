@@ -16,6 +16,7 @@ from .core.error_handlers import register_exception_handlers
 from .core.logging import RequestLoggingMiddleware, setup_logging
 from .core.rate_limit import get_rate_limiter
 from .core.database import _get_sessionmaker
+from .services.maya_hmac_control import check_maya_compatibility
 
 LOGGER = logging.getLogger("echora.app")
 
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
         try:
             with _get_sessionmaker()() as session:
                 session.execute(text('SELECT 1'))
+                check_maya_compatibility(session, settings)
             if settings.rate_limit_storage_uri:
                 client = redis.Redis.from_url(settings.rate_limit_storage_uri, socket_timeout=2, socket_connect_timeout=2)
                 try:
@@ -71,6 +73,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept", "X-Echora-CSRF", "Idempotency-Key"],
+        expose_headers=["X-Maya-Analysis-Id"],
     )
 
     # --- Rate limiting ---

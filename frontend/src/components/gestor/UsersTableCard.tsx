@@ -104,7 +104,7 @@ export function UsersTableCard({
             >
               <span>{roleKey === 'all' ? 'Todos' : roleLabel(roleKey)}</span>
               <span
-                className={`px-1.5 py-0.2 rounded text-[11px] tabular-nums ${
+                className={`px-1.5 py-0.5 rounded text-[11px] tabular-nums ${
                   active ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
                 }`}
               >

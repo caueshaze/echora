@@ -9,7 +9,7 @@ from .auth_session import AuthSession
 from .audit_event import AuditEvent
 from .reveal import RevealPermission, RevealRequest
 from .idempotency import AdminOperation
-from .maya import MayaAnalysis, MayaConversation, MayaQuestion, MayaDailyQuota
+from .maya import MayaAnalysis, MayaConversation, MayaQuestion, MayaDailyQuota, MayaHmacControl
 
 __all__ = [
     "User",
@@ -24,5 +24,5 @@ __all__ = [
     "RevealPermission",
     "RevealRequest",
     "AdminOperation",
-    "MayaAnalysis", "MayaConversation", "MayaQuestion", "MayaDailyQuota",
+    "MayaAnalysis", "MayaConversation", "MayaQuestion", "MayaDailyQuota", "MayaHmacControl",
 ]

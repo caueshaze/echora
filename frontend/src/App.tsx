@@ -1,6 +1,7 @@
 // src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { Protected } from './components/Protected' // <-- CORREÇÃO AQUI!
 import Login from './pages/Login'
 import Aluno from './pages/Aluno'
@@ -13,48 +14,50 @@ import TermsOfUsePage from './pages/TermsOfUsePage'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms" element={<TermsOfUsePage />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfUsePage />} />
 
-        <Route
-          path="/aluno"
-          element={
-            <Protected roles={['aluno']}>
-              <Aluno />
-            </Protected>
-          }
-        />
-        <Route
-          path="/professor"
-          element={
-            <Protected roles={['professor']}>
-              <Professor />
-            </Protected>
-          }
-        />
-        <Route
-          path="/gestor"
-          element={
-            <Protected roles={['gestor']}>
-              <Gestor />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <Protected roles={['admin']}>
-              <Admin />
-            </Protected>
-          }
-        />
+          <Route
+            path="/aluno"
+            element={
+              <Protected roles={['aluno']}>
+                <Aluno />
+              </Protected>
+            }
+          />
+          <Route
+            path="/professor"
+            element={
+              <Protected roles={['professor']}>
+                <Professor />
+              </Protected>
+            }
+          />
+          <Route
+            path="/gestor"
+            element={
+              <Protected roles={['gestor']}>
+                <Gestor />
+              </Protected>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <Protected roles={['admin']}>
+                <Admin />
+              </Protected>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthProvider>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

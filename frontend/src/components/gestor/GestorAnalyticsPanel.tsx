@@ -54,7 +54,7 @@ function ChartCard({
                 </div>
                 <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${colorClass}`}
+                    className={`h-full rounded-full ${colorClass} transition-all duration-700 ease-out`}
                     style={{ width: `${(value / maxValue) * 100}%` }}
                   />
                 </div>
@@ -107,17 +107,17 @@ function ProfessorSentimentCard({
                 </div>
                 <div className="h-2 rounded-full bg-slate-100 overflow-hidden flex">
                   <div
-                    className="h-full bg-emerald-500"
+                    className="h-full bg-emerald-500 transition-all duration-700 ease-out"
                     style={{ width: `${toPercent(item.positiveReceived)}%` }}
                     title="Positivos"
                   />
                   <div
-                    className="h-full bg-slate-300"
+                    className="h-full bg-slate-300 dark:bg-slate-600 transition-all duration-700 ease-out"
                     style={{ width: `${toPercent(item.neutralReceived)}%` }}
                     title="Neutros"
                   />
                   <div
-                    className="h-full bg-rose-500"
+                    className="h-full bg-rose-500 transition-all duration-700 ease-out"
                     style={{ width: `${toPercent(item.negativeReceived)}%` }}
                     title="Atenção"
                   />

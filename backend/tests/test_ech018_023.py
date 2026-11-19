@@ -22,7 +22,8 @@ class ECH018023Tests(unittest.TestCase):
                         database_url='postgresql+psycopg://user:pass@localhost/db',
                         rate_limit_storage_uri='redis://localhost:6379/0',
                         secret_key='d1b3f29c80a4e75d947d670c5be839a23f91ca3e5b22a61f1cd8b9e05841ef72',
-                        data_encryption_key=base64.b64encode(bytes(range(32))).decode())
+                        data_encryption_key=base64.b64encode(bytes(range(32))).decode(),
+                            maya_idempotency_hmac_key=base64.b64encode(bytes(range(32, 64))).decode())
 
     def test_docs_off_in_production_and_on_in_development(self):
         for settings, expected in [(self.production_settings(), 404),
@@ -59,7 +60,8 @@ class ECH018023Tests(unittest.TestCase):
                 'database_url': 'postgresql+psycopg://user:pass@localhost/db',
                 'rate_limit_storage_uri': 'redis://localhost:6379/0',
                 'secret_key': 'd1b3f29c80a4e75d947d670c5be839a23f91ca3e5b22a61f1cd8b9e05841ef72',
-                'data_encryption_key': base64.b64encode(bytes(range(32))).decode()}
+                'data_encryption_key': base64.b64encode(bytes(range(32))).decode(),
+                'maya_idempotency_hmac_key': base64.b64encode(bytes(range(32, 64))).decode()}
         for key in ('openai_api_base', 'sentiment_api_url', 'gemma_api_url'):
             with self.subTest(key=key), self.assertRaises(ValidationError):
                 Settings(**(base | {key: 'http://api.example.net/infer'}))
@@ -71,6 +73,7 @@ class ECH018023Tests(unittest.TestCase):
                 'rate_limit_storage_uri': 'redis://localhost:6379/0',
                 'secret_key': 'd1b3f29c80a4e75d947d670c5be839a23f91ca3e5b22a61f1cd8b9e05841ef72',
                 'data_encryption_key': base64.b64encode(bytes(range(32))).decode(),
+                'maya_idempotency_hmac_key': base64.b64encode(bytes(range(32, 64))).decode(),
                 'sentiment_api_url': 'http://127.0.0.1:9000/infer'}
         with self.assertRaises(ValidationError):
             Settings(**base)
@@ -121,6 +124,7 @@ class ECH018023Tests(unittest.TestCase):
                 'rate_limit_storage_uri': 'redis://localhost:6379/0',
                 'secret_key': 'd1b3f29c80a4e75d947d670c5be839a23f91ca3e5b22a61f1cd8b9e05841ef72',
                 'data_encryption_key': base64.b64encode(bytes(range(32))).decode(),
+                'maya_idempotency_hmac_key': base64.b64encode(bytes(range(32, 64))).decode(),
                 'sentiment_api_url': 'http://127.0.0.2:9000/infer'}
         self.assertFalse(Settings(**(base | {'sentiment_api_url': ''})).allow_loopback_http_integrations)
         with self.assertRaises(ValidationError):

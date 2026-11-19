@@ -133,6 +133,7 @@ export type ClassroomCreateInput = {
 }
 
 export type FeedbackSummary = {
+  analysis_id?: string | null
   summary_text: string
   positives: string[]
   opportunities: string[]

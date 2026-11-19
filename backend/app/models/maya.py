@@ -1,7 +1,7 @@
 """Encrypted Maya analyses and per-user contextual questions."""
 from datetime import date, datetime
 from uuid import uuid4
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 from ..core.database import Base
 
@@ -42,6 +42,7 @@ class MayaQuestion(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     request_key: Mapped[str] = mapped_column(String(64), nullable=False)
     request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_digest_version: Mapped[str] = mapped_column(String(16), nullable=False, server_default='legacy-v1')
     question_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     question_nonce: Mapped[str] = mapped_column(String(32), nullable=False)
     answer_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -57,3 +58,11 @@ class MayaDailyQuota(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     quota_date: Mapped[date] = mapped_column(Date, primary_key=True)
     consumed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class MayaHmacControl(Base):
+    __tablename__ = 'maya_hmac_control'
+    __table_args__ = (CheckConstraint('id = 1', name='ck_maya_hmac_control_singleton'),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key_identity: Mapped[str] = mapped_column(String(64), nullable=False)
+    legacy_barrier: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())

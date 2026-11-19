@@ -26,26 +26,44 @@ class FeedbackIntegrityError(ValueError):
     """A feedback could not be authenticated or decrypted."""
 
 
-def _keys() -> tuple[str, dict[str, bytes]]:
-    settings = get_settings()
+class _RedefinedV1(ValueError):
+    pass
+
+
+def _keys(settings=None) -> tuple[str, dict[str, bytes]]:
+    settings = settings or get_settings()
     try:
-        configured = json.loads(settings.data_encryption_keys)
+        def unique_pairs(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError('Versão duplicada')
+                result[key] = value
+            return result
+
+        configured = json.loads(settings.data_encryption_keys, object_pairs_hook=unique_pairs)
         if not isinstance(configured, dict):
             raise ValueError('DATA_ENCRYPTION_KEYS deve ser um objeto JSON')
         keys = {'v1': settings.encryption_key_bytes()}
         for version, value in configured.items():
             if not isinstance(version, str) or not re.fullmatch(r'v[1-9][0-9]*', version) or not isinstance(value, str):
                 raise ValueError('Versão de chave inválida')
+            if version == 'v1':
+                raise _RedefinedV1
             decoded = base64.b64decode(value, altchars=b'-_', validate=True)
             if len(decoded) != 32 or (settings.is_production and len(set(decoded)) < 16):
                 raise ValueError('Cada chave versionada deve conter 32 bytes')
+            if decoded in keys.values():
+                raise ValueError('Versões diferentes devem usar chaves distintas')
             keys[version] = decoded
         active = settings.data_encryption_active_key
         if active not in keys:
             raise ValueError('Versão ativa de chave inexistente')
         return active, keys
-    except (ValueError, TypeError, binascii.Error) as exc:
-        raise ValueError('Configuração de chaves de feedback inválida') from exc
+    except _RedefinedV1:
+        raise ValueError('DATA_ENCRYPTION_KEYS não pode redefinir a versão v1') from None
+    except (ValueError, TypeError, binascii.Error, UnicodeError):
+        raise ValueError('Configuração de chaves de criptografia inválida') from None
 
 
 def _aad(sender_id: str, target_type: str, target_id: str, is_anonymous: bool) -> bytes:
@@ -68,8 +86,8 @@ def encrypt_maya_content(text: str, *, kind: str, record_id: str) -> tuple[str, 
     return f'{active}:{base64.b64encode(ciphertext).decode()}', base64.b64encode(nonce).decode()
 
 
-def decrypt_maya_content(ciphertext: str, nonce: str, *, kind: str, record_id: str) -> str:
-    _, keys = _keys()
+def decrypt_maya_content(ciphertext: str, nonce: str, *, kind: str, record_id: str, settings=None) -> str:
+    _, keys = _keys(settings)
     try:
         version, encoded = ciphertext.split(':', 1)
         aad = json.dumps(['maya', kind, record_id], separators=(',', ':')).encode()

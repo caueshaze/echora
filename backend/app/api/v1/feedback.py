@@ -52,6 +52,8 @@ from .feedback_utils import (
 from .admin.idempotency import administrative_idempotency
 from ...services.audit_service import record_event
 
+from ...services.maya_hmac_control import require_maya_compatibility
+
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 limiter = get_rate_limiter()
 
@@ -658,6 +660,7 @@ def delete_my_feedback(
 
 @router.get(
     "/summary/me",
+    dependencies=[Depends(require_maya_compatibility)],
     response_model=FeedbackSummary,
     summary="Resumo com IA para o usuário autenticado",
 )
@@ -671,12 +674,14 @@ def summarize_my_feedbacks(
     metadata = {}
     result = generate_personal_summary(db=db, current_user=current_user, metadata_out=metadata)
     if current_user.role in ('aluno', 'professor'):
-        create_analysis(db, current_user, result.summary_text, current_user.role, current_user.school_id, metadata)
+        analysis = create_analysis(db, current_user, result.summary_text, current_user.role, current_user.school_id, metadata)
+        response.headers['X-Maya-Analysis-Id'] = analysis.id
     return result
 
 
 @router.get(
     "/summary/admin",
+    dependencies=[Depends(require_maya_compatibility)],
     response_model=FeedbackSummary,
     summary="Resumo estratégico com IA para administradores/gestores",
 )
@@ -690,6 +695,7 @@ def summarize_all_feedbacks(
 ) -> FeedbackSummary:
     metadata = {}
     result = generate_admin_summary(db=db, current_user=current_user, school_id=school_id, metadata_out=metadata)
-    create_analysis(db, current_user, result.summary_text, 'institucional',
-                    resolve_school_assignment(current_user, school_id), metadata)
+    analysis = create_analysis(db, current_user, result.summary_text, 'institucional',
+                               resolve_school_assignment(current_user, school_id), metadata)
+    response.headers['X-Maya-Analysis-Id'] = analysis.id
     return result

@@ -77,6 +77,7 @@ class AdminSummarySecurityTests(unittest.TestCase):
         self.assertNotIn('cross-sender', prompt)
         self.assertNotIn('secret-b', response.text)
         saved = self.db.query(MayaAnalysis).one()
+        self.assertEqual(response.headers['X-Maya-Analysis-Id'], saved.id)
         self.assertEqual(saved.feedback_count, 3)
         self.assertEqual(saved.school_id, 1)
         self.assertEqual(saved.kind, 'institucional')
@@ -149,8 +150,20 @@ class AdminSummarySecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(set(response.json()), {'summary_text', 'positives', 'opportunities', 'gemma_ready'})
         saved = self.db.query(MayaAnalysis).one()
+        self.assertEqual(response.headers['X-Maya-Analysis-Id'], saved.id)
         self.assertEqual((saved.requester_id, saved.kind, saved.school_id), ('u1', 'aluno', 1))
         self.assertEqual(analysis_content(saved), response.json()['summary_text'])
+
+    def test_generated_analysis_header_is_exposed_for_cross_origin_clients(self):
+        from backend.app.main import create_app
+        app = create_app()
+        app.dependency_overrides[get_current_user] = lambda: self.user
+        app.dependency_overrides[get_session] = lambda: self.db
+        limiter.reset()
+        response = TestClient(app).get('/api/v1/feedback/summary/admin', headers={'Origin': 'http://localhost:5173'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn('x-maya-analysis-id', response.headers['access-control-expose-headers'].lower())
+        self.assertEqual(response.headers['x-maya-analysis-id'], self.db.query(MayaAnalysis).one().id)
 
     def test_configured_rate_limit_requires_positive_integer(self):
         with patch.dict(os.environ, {'SUMMARY_ADMIN_REQUESTS_PER_HOUR': '30'}):

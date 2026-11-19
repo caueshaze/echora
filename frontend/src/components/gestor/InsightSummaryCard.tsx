@@ -36,7 +36,7 @@ export function InsightSummaryCard({
           onClick={onGenerate}
           disabled={summaryLoading}
         >
-          <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+          <Sparkles className={`h-4 w-4 ${summaryLoading ? 'animate-pulse' : ''}`} strokeWidth={1.75} />
           {summaryLoading ? 'Gerando análise...' : 'Gerar análise'}
         </button>
       </div>
@@ -47,10 +47,15 @@ export function InsightSummaryCard({
         </div>
       )}
 
-      {summaryLoading && <p role="status" className="text-sm text-slate-600">A Maya está analisando os relatos selecionados.</p>}
+      {summaryLoading && (
+        <p role="status" className="inline-flex items-center gap-2 text-sm text-slate-600 animate-fadeIn">
+          <Sparkles className="h-4 w-4 text-brand-600 animate-pulse shrink-0" />
+          <span>A Maya está analisando os relatos selecionados.</span>
+        </p>
+      )}
 
       {summary && (
-        <div className="space-y-4 pt-2 border-t border-slate-100">
+        <div className="space-y-4 pt-2 border-t border-slate-100 animate-fadeUp">
           {summary.summary_text?.trim() ? <ExecutiveReport text={summary.summary_text} /> : (
             <p className="text-sm text-slate-600">Nenhuma análise foi disponibilizada. Tente gerar novamente.</p>
           )}

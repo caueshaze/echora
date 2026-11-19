@@ -4,13 +4,20 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 
-let server, ExecutiveReport, InsightSummaryCard
+let server, ExecutiveReport, InsightSummaryCard, EchoraLogo
 before(async () => {
   server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' })
   ;({ ExecutiveReport } = await server.ssrLoadModule('/src/components/gestor/ExecutiveReport.tsx'))
   ;({ InsightSummaryCard } = await server.ssrLoadModule('/src/components/gestor/InsightSummaryCard.tsx'))
+  ;({ EchoraLogo } = await server.ssrLoadModule('/src/components/brand/EchoraLogo.tsx'))
 })
 after(async () => { await server?.close() })
+
+test('uses the favicon SVG for the brand and labels the standalone icon', () => {
+  const logo = renderToStaticMarkup(React.createElement(EchoraLogo, { iconOnly: true }))
+  assert.match(logo, /src="\/favicon\.svg"/)
+  assert.match(logo, /aria-label="Echora"/)
+})
 
 test('renders structured and legacy reports', () => {
   const html = renderToStaticMarkup(React.createElement(ExecutiveReport, { text: '## Panorama\n\nTexto curto.\n\n- Primeiro\n- Segundo' }))

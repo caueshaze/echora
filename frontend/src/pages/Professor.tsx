@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { FeedbackComposer } from '../components/feedback/FeedbackComposer'
+import { ActionModal } from '../components/layout/ActionModal'
 import { AppShell, type NavItem } from '../components/layout/AppShell'
 import { FeedbackListSection } from '../components/personal/FeedbackListSection'
 import { PersonalOverview } from '../components/personal/PersonalOverview'
@@ -77,6 +78,8 @@ export default function Professor() {
   } = usePersonalFeedbacks()
   const triggerAlerts = useTriggerAlerts()
   const [reportStatus, setReportStatus] = useState<string | null>(null)
+  const [reportingFeedback, setReportingFeedback] = useState<FeedbackPublic | null>(null)
+  const [reportingBusy, setReportingBusy] = useState(false)
 
   useEffect(() => {
     void loadFeedbacks()
@@ -107,27 +110,27 @@ export default function Professor() {
     [feedbacks.received.length, triggerAlerts.alerts.length],
   )
 
-  const handleReportFeedback = async (feedback: FeedbackPublic) => {
+  const handleReportFeedback = (feedback: FeedbackPublic) => {
     if (feedback.has_trigger) {
       setReportStatus('Este relato já está sinalizado para análise da gestão.')
       return
     }
-    const reason = window.prompt('Informe brevemente o motivo para encaminhar à coordenação:')
-    if (reason === null) {
-      return
-    }
-    const trimmed = reason.trim()
-    if (trimmed.length < 5) {
-      setReportStatus('Descreva o motivo com pelo menos 5 caracteres.')
-      return
-    }
+    setReportingFeedback(feedback)
+  }
+
+  const handleConfirmReport = async (reason: string) => {
+    if (!reportingFeedback) return
+    setReportingBusy(true)
     setReportStatus('Encaminhando para a coordenação...')
     try {
-      await reportFeedback(feedback.id, { reason: trimmed })
+      await reportFeedback(reportingFeedback.id, { reason })
       setReportStatus('Relato encaminhado para acompanhamento da gestão.')
+      setReportingFeedback(null)
       await Promise.all([loadFeedbacks(), triggerAlerts.loadAlerts()])
     } catch (error: any) {
       setReportStatus(error?.message || 'Não foi possível sinalizar este relato.')
+    } finally {
+      setReportingBusy(false)
     }
   }
 
@@ -238,21 +241,37 @@ export default function Professor() {
   const currentMeta = SECTION_META[activeSection]
 
   return (
-    <AppShell
-      userName={session?.fullName || 'Professor(a)'}
-      userEmail={session?.email}
-      roleLabel="Docente"
-      pageTitle={currentMeta.title}
-      pageSubtitle={currentMeta.subtitle}
-      items={navItems}
-      bottomNavIds={['welcome', 'received', 'compose', 'alerts', 'insights']}
-      activeId={activeSection}
-      onSelect={setActiveSection}
-      onLogout={logout}
-      onRefresh={loadFeedbacks}
-      refreshLoading={loading}
-    >
-      {renderSection()}
-    </AppShell>
+    <>
+      <AppShell
+        userName={session?.fullName || 'Professor(a)'}
+        userEmail={session?.email}
+        roleLabel="Docente"
+        pageTitle={currentMeta.title}
+        pageSubtitle={currentMeta.subtitle}
+        items={navItems}
+        bottomNavIds={['welcome', 'received', 'compose', 'alerts', 'insights']}
+        activeId={activeSection}
+        onSelect={setActiveSection}
+        onLogout={logout}
+        onRefresh={loadFeedbacks}
+        refreshLoading={loading}
+      >
+        {renderSection()}
+      </AppShell>
+
+      <ActionModal
+        open={Boolean(reportingFeedback)}
+        mode="prompt"
+        title="Encaminhar à coordenação"
+        description="Descreva brevemente o motivo para que a equipe gestora dê prioridade a este relato."
+        inputLabel="Motivo do encaminhamento"
+        inputPlaceholder="Ex.: Situação recorrente em sala que exige mediação..."
+        minLength={5}
+        confirmLabel="Encaminhar relato"
+        loading={reportingBusy}
+        onConfirm={handleConfirmReport}
+        onClose={() => setReportingFeedback(null)}
+      />
+    </>
   )
 }

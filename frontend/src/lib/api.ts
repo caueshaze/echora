@@ -28,7 +28,7 @@ export type ApiError = Error & { status?: number }
 
 const BASE_URL = API_BASE_URL.replace(/\/$/, '')
 
-async function authFetch<T>(path: string, options: RequestInit = {}, retryOn401 = true): Promise<T> {
+async function authFetch<T>(path: string, options: RequestInit = {}, retryOn401 = true, onResponse?: (response: Response) => void): Promise<T> {
   const initialToken = await ensureValidAccessToken()
   if (!initialToken) {
     clearToken()
@@ -57,7 +57,7 @@ async function authFetch<T>(path: string, options: RequestInit = {}, retryOn401 
       const refreshed = await refreshAccessToken()
       if (refreshed) {
         headers.set('Authorization', `Bearer ${refreshed}`)
-        return authFetch(path, { ...options, headers }, false)
+        return authFetch(path, { ...options, headers }, false, onResponse)
       }
     }
     clearToken()
@@ -76,6 +76,8 @@ async function authFetch<T>(path: string, options: RequestInit = {}, retryOn401 
     error.status = response.status
     throw error
   }
+
+  onResponse?.(response)
 
   if (response.status === 204) {
     return undefined as T
@@ -302,8 +304,16 @@ export function deleteClassroom(classroomId: number) {
   })
 }
 
+async function fetchSummary(path: string) {
+  let analysisId: string | null = null
+  const summary = await authFetch<FeedbackSummary>(path, {}, true, response => {
+    analysisId = response.headers.get('X-Maya-Analysis-Id')
+  })
+  return { ...summary, analysis_id: analysisId }
+}
+
 export function fetchSummaryForMe() {
-  return authFetch<FeedbackSummary>('/api/v1/feedback/summary/me')
+  return fetchSummary('/api/v1/feedback/summary/me')
 }
 
 export function fetchSummaryForAdmin(params: { school_id?: number } = {}) {
@@ -311,7 +321,7 @@ export function fetchSummaryForAdmin(params: { school_id?: number } = {}) {
   if (params.school_id) search.set('school_id', String(params.school_id))
   const query = search.toString()
   const path = `/api/v1/feedback/summary/admin${query ? `?${query}` : ''}`
-  return authFetch<FeedbackSummary>(path)
+  return fetchSummary(path)
 }
 
 export function deleteAllFeedbacks() {

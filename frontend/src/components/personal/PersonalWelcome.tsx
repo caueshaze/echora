@@ -7,6 +7,13 @@ type PersonalWelcomeProps<T extends string> = {
   onNavigate: (target: T) => void
 }
 
+function getTimeGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Bom dia'
+  if (hour < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 export function PersonalWelcome<T extends string>({
   roleLabel,
   tips,
@@ -14,6 +21,7 @@ export function PersonalWelcome<T extends string>({
   onNavigate,
 }: PersonalWelcomeProps<T>) {
   const firstName = roleLabel.split(' ')[0] || roleLabel
+  const greeting = getTimeGreeting()
 
   return (
     <div className="space-y-4">
@@ -22,7 +30,7 @@ export function PersonalWelcome<T extends string>({
           <button
             key={action.target}
             type="button"
-            className="card p-5 text-left group hover:border-brand-500/60 transition-all flex items-start justify-between gap-3"
+            className="card p-5 text-left group hover:border-brand-500/60 hover:-translate-y-0.5 hover:shadow-elevated transition-all duration-200 flex items-start justify-between gap-3"
             onClick={() => onNavigate(action.target)}
           >
             <div className="space-y-1">
@@ -32,7 +40,7 @@ export function PersonalWelcome<T extends string>({
               <p className="text-sm text-slate-500 leading-relaxed">{action.description}</p>
             </div>
             <span className="h-8 w-8 rounded-lg bg-slate-50 group-hover:bg-brand-50 text-slate-400 group-hover:text-brand-700 grid place-items-center shrink-0 transition-colors">
-              <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+              <ArrowUpRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={2} />
             </span>
           </button>
         ))}
@@ -40,7 +48,7 @@ export function PersonalWelcome<T extends string>({
 
       <section className="card p-5 space-y-3">
         <p className="text-sm font-semibold text-slate-800">
-          Bom dia de trabalho, {firstName}. Orientações rápidas:
+          {greeting}, {firstName}. Orientações rápidas:
         </p>
         <ul className="grid gap-2.5 text-sm text-slate-600 sm:grid-cols-3">
           {tips.map((tip, index) => (

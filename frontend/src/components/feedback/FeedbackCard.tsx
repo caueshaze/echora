@@ -62,7 +62,7 @@ export function FeedbackCard({
         : feedback.target_name || `Destinatário #${feedback.target_id.slice(0, 6)}`
 
   return (
-    <article className="p-4 sm:p-5 rounded-xl border border-slate-200/80 bg-white space-y-3 transition-colors hover:border-slate-300/80">
+    <article className="p-4 sm:p-5 rounded-xl border border-slate-200/80 bg-white space-y-3 transition-all duration-150 hover:border-slate-300/80 dark:hover:border-slate-700 hover:shadow-xs">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
         <div className="flex flex-wrap items-center gap-1.5 font-medium text-slate-700">
           <span className="inline-flex items-center gap-1 truncate max-w-[210px] sm:max-w-none">
