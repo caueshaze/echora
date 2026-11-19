@@ -1,10 +1,12 @@
 import unittest
 import json
+import os
 from datetime import datetime
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -13,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.app.api.v1.feedback import router, limiter
 from backend.app.core.database import Base, get_session
+from backend.app.core.config import Settings
 from backend.app.core.security import get_current_user
 from backend.app.models import Feedback, User
 from backend.app.models.organization import Classroom, School, Subject
@@ -42,7 +45,10 @@ class AdminSummarySecurityTests(unittest.TestCase):
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         limiter.reset()
         app.include_router(router, prefix='/api/v1')
-        app.dependency_overrides[get_current_user] = lambda: self.user
+        def current_user(request: Request):
+            request.state.user_id = self.user.id
+            return self.user
+        app.dependency_overrides[get_current_user] = current_user
         app.dependency_overrides[get_session] = lambda: self.db
         self.client = TestClient(app)
         self.decrypt = patch('backend.app.core.llm.decrypt_feedback', side_effect=lambda feedback: feedback.content_encrypted)
@@ -108,6 +114,32 @@ class AdminSummarySecurityTests(unittest.TestCase):
         for _ in range(3):
             self.assertEqual(self.client.get('/api/v1/feedback/summary/admin').status_code, 200)
         self.assertEqual(self.client.get('/api/v1/feedback/summary/admin').status_code, 429)
+
+    def test_configured_rate_limit_is_per_user_and_counts_failures(self):
+        settings = Settings(_env_file=None, app_env='test', summary_admin_requests_per_hour=2)
+        with patch('backend.app.core.rate_limit.get_settings', return_value=settings):
+            url = '/api/v1/feedback/summary/admin'
+            self.assertEqual(self.client.get(url, params={'school_id': 2}).status_code, 403)
+            self.assertEqual(self.client.get(url).status_code, 200)
+            self.assertEqual(self.client.get(url).status_code, 429)
+            self.user.id = 'other-manager'
+            self.assertEqual(self.client.get(url).status_code, 200)
+            self.assertEqual(self.client.get(url).status_code, 200)
+            self.assertEqual(self.client.get(url).status_code, 429)
+
+    def test_personal_rate_limit_remains_three_per_hour(self):
+        settings = Settings(_env_file=None, app_env='test', summary_admin_requests_per_hour=10)
+        with patch('backend.app.core.rate_limit.get_settings', return_value=settings):
+            for _ in range(3):
+                self.assertEqual(self.client.get('/api/v1/feedback/summary/me').status_code, 200)
+            self.assertEqual(self.client.get('/api/v1/feedback/summary/me').status_code, 429)
+
+    def test_configured_rate_limit_requires_positive_integer(self):
+        with patch.dict(os.environ, {'SUMMARY_ADMIN_REQUESTS_PER_HOUR': '30'}):
+            self.assertEqual(Settings(_env_file=None, app_env='test').summary_admin_requests_per_hour, 30)
+        for value in ('0', '-1', 'invalid'):
+            with self.subTest(value=value), patch.dict(os.environ, {'SUMMARY_ADMIN_REQUESTS_PER_HOUR': value}), self.assertRaises(ValidationError):
+                Settings(_env_file=None, app_env='test')
 
 
 if __name__ == '__main__':

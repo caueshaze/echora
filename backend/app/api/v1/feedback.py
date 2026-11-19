@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, aliased, joinedload
 from ...core.crypto import encrypt_feedback
 from ...core.database import get_session
 from ...core.security import get_current_user, require_role
-from ...core.rate_limit import get_rate_limiter, summary_rate_key
+from ...core.rate_limit import admin_summary_rate_limit, get_rate_limiter, summary_rate_key
 from ...core.sentiment import analyze_sentiment
 from ...core.triggers import detect_triggers, load_trigger_keywords
 from ...core.llm import (
@@ -674,7 +674,7 @@ def summarize_my_feedbacks(
     response_model=FeedbackSummary,
     summary="Resumo estratégico com IA para administradores/gestores",
 )
-@limiter.limit("3/hour", key_func=summary_rate_key)
+@limiter.limit(admin_summary_rate_limit, key_func=summary_rate_key)
 def summarize_all_feedbacks(
     request: Request,
     response: Response,

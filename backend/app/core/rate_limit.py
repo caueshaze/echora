@@ -27,6 +27,11 @@ def login_rate_limit() -> str:
     return "5/minute"
 
 
+def admin_summary_rate_limit() -> str:
+    """Limit executive report requests per user and hour."""
+    return f"{get_settings().summary_admin_requests_per_hour}/hour"
+
+
 def summary_rate_key(request: Request) -> str:
     user_id = getattr(request.state, "user_id", None)
     return f"user:{user_id}" if user_id else get_remote_address(request)

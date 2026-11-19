@@ -34,6 +34,10 @@ SUMMARY_OPENAI_MAX_COMPLETION_TOKENS e SUMMARY_OPENAI_RETRY_MAX_COMPLETION_TOKEN
 de raciocínio e resposta; aumentá-los pode elevar o custo. A aplicação lê esses
 valores na inicialização: após alterar .env.prod, recrie o contêiner backend.
 deploy/compose.env configura a interpolação do Compose, não o ambiente da API.
+SUMMARY_ADMIN_REQUESTS_PER_HOUR define o limite de requisições do Relatório
+Executivo por usuário e hora (padrão 3); solicitações que falham também contam.
+Para testes, ajuste esse valor em .env.prod e recrie o backend. Retorne-o a um
+valor adequado depois dos testes; cada geração pode gerar chamadas tarifadas.
 
 Comandos posteriores na VPS, após verificar colisões e IPs:
   docker network create --internal --subnet 172.30.86.0/24 echora_proxy
