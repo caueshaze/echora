@@ -191,6 +191,18 @@ A página do gestor (em React) exibe:
 -   **Uso Educacional:** protótipo acadêmico, não pronto para produção.
 ## Implantação segura
 
-Veja [PostgreSQL e migrações](docs/postgresql-migracoes.md). Os modelos em `deploy/` exigem revisão dos domínios, caminhos, certificados, Redis, firewall e privilégios antes do uso. Compile o frontend com `VITE_API_BASE_URL=""` para servir a API na mesma origem; configure `ECHORA_HOST` e `ECHORA_FRONTEND_ROOT` no Caddy. Execute o backup criptografado como tarefa agendada e teste a restauração e a chave de descriptografia fora do servidor.
+Os modelos em `deploy/` exigem revisão dos domínios, caminhos, certificados, Redis, firewall e privilégios antes do uso. Compile o frontend com `VITE_API_BASE_URL=""` para servir a API na mesma origem; configure `ECHORA_HOST` e `ECHORA_FRONTEND_ROOT` no Caddy. Execute o backup criptografado como tarefa agendada e teste a restauração e a chave de descriptografia fora do servidor.
 
-Veja também [notas de implantação de segurança](docs/seguranca-implantacao.md).
+### Corte HMAC v2 da Maya
+
+O procedimento administrativo é `python -m scripts.migrate_maya_hmac_production` e exige a URL explícita `ECHORA_MAYA_HMAC_ADMIN_DATABASE_URL`, nunca `echora_app`, além de `ECHORA_MAYA_HMAC_PRODUCTION_APPROVAL=YES` e `--confirm-production`. Execute uma fase por vez, sempre com confirmação do resultado:
+
+1. aplicar as migrations Alembic e validar a revisão;
+2. aplicar `deploy/postgres-grants.sql` com o usuário de migração, sem conceder propriedade a `echora_app`;
+3. manter `MAYA_IDEMPOTENCY_WRITE_VERSION=legacy-v1` e executar `initialize`;
+4. publicar o backend compatível, validar readiness e rotas;
+5. trocar a escrita para `hmac-v2` e validar o readiness;
+6. executar `backfill`;
+7. executar `barrier` somente após o backfill concluir sem digests legados.
+
+O executor não aplica migrations ou grants e não possui modo combinado. Cada fase é transacional; falhas abortam a transação. O rollback após a primeira escrita `hmac-v2` ou após o backfill não é obtido apenas revertendo a variável de ambiente: seguir o plano operacional de restauração validado.
