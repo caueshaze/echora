@@ -1,3 +1,4 @@
+import { MayaHistory } from '../components/maya/MayaHistory'
 import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart3,
@@ -219,12 +220,15 @@ export default function Professor() {
         )
       case 'insights':
         return (
+          <div className="space-y-5">
           <PersonalSummaryCard
             summary={summary}
             summaryLoading={summaryLoading}
             summaryStatus={summaryStatus}
             onGenerate={handleSummary}
           />
+            <MayaHistory role="professor" summary={summary} />
+          </div>
         )
       default:
         return null

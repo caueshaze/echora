@@ -1,3 +1,4 @@
+import { MayaHistory } from '../components/maya/MayaHistory'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BarChart3,
@@ -358,12 +359,15 @@ export default function Gestor() {
         )
       case 'insights':
         return (
+          <div className="space-y-5">
           <InsightSummaryCard
             summary={summary}
             summaryLoading={summaryLoading}
             summaryStatus={summaryStatus}
             onGenerate={loadSummary}
           />
+            <MayaHistory role="gestor" summary={summary} />
+          </div>
         )
       case 'feedbacks':
         return (

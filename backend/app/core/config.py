@@ -106,6 +106,7 @@ class Settings(BaseSettings):
         default="gpt-5-nano",
     )
     summary_admin_requests_per_hour: int = Field(default=3, ge=1)
+    maya_daily_question_limit: int = Field(default=5, ge=1)
     # Limits include both reasoning and visible output tokens.
     summary_openai_max_completion_tokens: int = Field(default=512, ge=1)
     summary_openai_retry_max_completion_tokens: int = Field(default=1024, ge=1)

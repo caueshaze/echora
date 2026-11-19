@@ -18,6 +18,8 @@ from backend.app.core.database import Base, get_session
 from backend.app.core.config import Settings
 from backend.app.core.security import get_current_user
 from backend.app.models import Feedback, User
+from backend.app.models.maya import MayaAnalysis
+from backend.app.services.maya_service import analysis_content
 from backend.app.models.organization import Classroom, School, Subject
 from backend.app.schemas.user import UserPublic
 
@@ -29,6 +31,8 @@ class AdminSummarySecurityTests(unittest.TestCase):
         self.db = Session(self.engine)
         self.db.add_all([School(id=1, name='A'), School(id=2, name='B')])
         self.db.add_all([User(id=f'u{i}', email=f'u{i}@example.com', full_name=f'U{i}', role='aluno', school_id=i, hashed_password='x') for i in (1, 2)])
+        self.db.add_all([User(id='manager', email='manager@example.com', full_name='Manager', role='gestor', school_id=1, hashed_password='x'),
+                         User(id='other-manager', email='other@example.com', full_name='Outro', role='gestor', school_id=1, hashed_password='x')])
         self.db.add_all([Subject(id=1, name='A', school_id=1), Subject(id=2, name='B', school_id=2), Classroom(id=1, name='A', school_id=1)])
         self.db.add_all([
             Feedback(sender_id='u1', target_type='user', target_id='u1', content_encrypted='allowed-user', nonce='n', sentiment_label='positivo'),
@@ -72,6 +76,11 @@ class AdminSummarySecurityTests(unittest.TestCase):
         self.assertNotIn('cross-school', prompt)
         self.assertNotIn('cross-sender', prompt)
         self.assertNotIn('secret-b', response.text)
+        saved = self.db.query(MayaAnalysis).one()
+        self.assertEqual(saved.feedback_count, 3)
+        self.assertEqual(saved.school_id, 1)
+        self.assertEqual(saved.kind, 'institucional')
+        self.assertEqual(analysis_content(saved), response.json()['summary_text'])
 
     def test_selection_metadata_uses_only_authorized_limited_records(self):
         feedbacks = self.db.query(Feedback).all()
@@ -133,6 +142,15 @@ class AdminSummarySecurityTests(unittest.TestCase):
             for _ in range(3):
                 self.assertEqual(self.client.get('/api/v1/feedback/summary/me').status_code, 200)
             self.assertEqual(self.client.get('/api/v1/feedback/summary/me').status_code, 429)
+
+    def test_personal_summary_is_saved_without_changing_response_contract(self):
+        self.user = UserPublic(id='u1', email='u1@example.com', full_name='U1', role='aluno', school_id=1)
+        response = self.client.get('/api/v1/feedback/summary/me')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(set(response.json()), {'summary_text', 'positives', 'opportunities', 'gemma_ready'})
+        saved = self.db.query(MayaAnalysis).one()
+        self.assertEqual((saved.requester_id, saved.kind, saved.school_id), ('u1', 'aluno', 1))
+        self.assertEqual(analysis_content(saved), response.json()['summary_text'])
 
     def test_configured_rate_limit_requires_positive_integer(self):
         with patch.dict(os.environ, {'SUMMARY_ADMIN_REQUESTS_PER_HOUR': '30'}):

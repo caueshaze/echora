@@ -1,0 +1,15 @@
+# Histórico e perguntas para Maya
+
+A síntese gerada é persistida criptografada; o histórico mostra somente análises que o perfil ainda tem permissão para acessar. Gestores veem análises institucionais da sua escola; professores e alunos veem suas próprias sínteses, na escola atual. Administradores veem análises institucionais. Cada usuário tem sua própria conversa em cada análise. Dados de entrada e respostas são criptografados com as chaves versionadas existentes, usando identificação autenticada de cada registro. Os relatos originais não são copiados para o histórico do chat.
+
+`MAYA_DAILY_QUESTION_LIMIT` define o limite por usuário e por dia, padrão 5. O dia termina à meia-noite em America/Sao_Paulo. Uma pergunta utiliza uma reserva transacional; falha sem resposta utilizável libera a reserva. Reservas abandonadas são liberadas quando a quota é consultada ou outra pergunta é enviada, depois de cinco minutos. Uma chave de idempotência UUID evita repetir uma solicitação já concluída ou em andamento. O cliente a reutiliza ao tentar novamente enquanto a tela permanece aberta; depois de recarregar, consulte a conversa antes de reenviar. O máximo de entrada é 2.000 caracteres; são enviados até 12.000 caracteres da análise e cinco pares anteriores, com limite de 3.000 caracteres por resposta anterior. Os limites de saída do chat usam as variáveis OpenAI existentes. Atualmente o chat usa o provedor OpenAI configurado.
+
+A geração de relatório institucional continua usando `SUMMARY_ADMIN_REQUESTS_PER_HOUR`. A geração de sínteses pessoais continua limitada a três requisições por hora por usuário. Chamadas ao provedor podem ser tarifadas mesmo quando falham.
+
+## Preparação para implantação
+
+A migração `a7d41e6b2c90` acrescenta quatro tabelas. Em uma janela controlada, faça backup verificável e siga `deploy/OPERACAO.txt`: atualize o código e construa a imagem, execute a migração com a credencial de migração separada, reaplique `deploy/postgres-grants.sql` como proprietário e verifique os privilégios antes de iniciar o backend atualizado. Ajuste `MAYA_DAILY_QUESTION_LIMIT=5` em `.env.prod` (não em `deploy/compose.env`) se desejar explicitar o padrão. Recrie o backend após modificar seu ambiente. Atualize também o frontend. Não há migração nem deploy automáticos.
+
+A migração de downgrade remove as quatro tabelas e todo o histórico e conversas nelas armazenados. Só execute reversão após decidir como preservar esses dados e validar a restauração. Relatórios gerados antes da migração não são reconstruídos retroativamente.
+
+Ao excluir uma conta, conversas e quotas dessa pessoa são removidas por cascata; a referência ao solicitante nas análises é apagada. Análises pessoais sem solicitante permanecem cifradas e inacessíveis pela API; definir uma política de retenção ou eliminação desses registros depende de decisão posterior. Análises institucionais permanecem acessíveis a gestores autorizados da escola.

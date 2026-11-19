@@ -59,6 +59,26 @@ def encrypt_feedback(text: str, *, sender_id: str, target_type: str, target_id: 
     return f'{active}:{base64.b64encode(ciphertext).decode()}', base64.b64encode(nonce).decode()
 
 
+def encrypt_maya_content(text: str, *, kind: str, record_id: str) -> tuple[str, str]:
+    """Encrypt Maya content with versioned keys and record-specific authenticated data."""
+    active, keys = _keys()
+    nonce = os.urandom(12)
+    aad = json.dumps(['maya', kind, record_id], separators=(',', ':')).encode()
+    ciphertext = AESGCM(keys[active]).encrypt(nonce, text.encode('utf-8'), aad)
+    return f'{active}:{base64.b64encode(ciphertext).decode()}', base64.b64encode(nonce).decode()
+
+
+def decrypt_maya_content(ciphertext: str, nonce: str, *, kind: str, record_id: str) -> str:
+    _, keys = _keys()
+    try:
+        version, encoded = ciphertext.split(':', 1)
+        aad = json.dumps(['maya', kind, record_id], separators=(',', ':')).encode()
+        return AESGCM(keys[version]).decrypt(base64.b64decode(nonce, validate=True),
+                                              base64.b64decode(encoded, validate=True), aad).decode('utf-8')
+    except (InvalidTag, ValueError, KeyError, UnicodeDecodeError, binascii.Error, TypeError) as exc:
+        raise FeedbackIntegrityError('Não foi possível autenticar o conteúdo da Maya') from exc
+
+
 def decrypt_feedback(feedback: Feedback) -> str:
     """Read authenticated data; migrate a legacy row after successful decryption."""
     from ..models import Feedback as FeedbackModel

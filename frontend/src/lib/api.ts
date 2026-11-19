@@ -373,3 +373,24 @@ export function fetchAdminMetricsOverview() {
 export function fetchAdminHealthMetrics() {
   return authFetch<AdminHealthMetrics>('/api/v1/admin/metrics/health')
 }
+
+export type MayaAnalysis = { id: string; kind: 'institucional' | 'professor' | 'aluno'; school_id: number | null; created_at: string; feedback_count: number; period_start: string | null; period_end: string | null; status: string; summary_text?: string }
+export type MayaQuota = { limit: number; remaining: number; date: string; reset_at: string }
+export type MayaMessage = { id: string; question: string; answer: string; created_at: string }
+export function fetchMayaHistory(offset = 0) {
+  return authFetch<{ items: MayaAnalysis[]; has_more: boolean }>(`/api/v1/maya/analyses?offset=${offset}&limit=20`)
+}
+export function fetchMayaAnalysis(id: string) {
+  return authFetch<MayaAnalysis>(`/api/v1/maya/analyses/${encodeURIComponent(id)}`)
+}
+export function fetchMayaMessages(id: string) {
+  return authFetch<{ items: MayaMessage[]; quota: MayaQuota }>(`/api/v1/maya/analyses/${encodeURIComponent(id)}/messages`)
+}
+export function fetchMayaQuota() {
+  return authFetch<MayaQuota>('/api/v1/maya/quota')
+}
+export function askMaya(id: string, question: string, key: string) {
+  return authFetch<{ message: MayaMessage; quota: MayaQuota }>(`/api/v1/maya/analyses/${encodeURIComponent(id)}/questions`, {
+    method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ question }),
+  })
+}

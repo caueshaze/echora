@@ -1,3 +1,4 @@
+import { MayaHistory } from '../components/maya/MayaHistory'
 import { useEffect, useMemo, useState } from 'react'
 import { Home, Inbox, PenSquare, Send, Sparkles } from 'lucide-react'
 
@@ -150,12 +151,15 @@ export default function Aluno() {
         )
       case 'insights':
         return (
+          <div className="space-y-5">
           <PersonalSummaryCard
             summary={summary}
             summaryLoading={summaryLoading}
             summaryStatus={summaryStatus}
             onGenerate={handleSummary}
           />
+            <MayaHistory role="aluno" summary={summary} />
+          </div>
         )
       default:
         return null

@@ -40,12 +40,13 @@ END $$;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO echora_backup;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO echora_backup;
 
--- Inventário completo até f9b3d94858b1: leitura apenas nas tabelas conhecidas.
+-- Inventário completo até a7d41e6b2c90: leitura apenas nas tabelas conhecidas.
 GRANT SELECT ON TABLE public.alembic_version, public.schools, public.classrooms,
   public.subjects, public.trigger_keywords, public.classroom_subjects, public.users,
   public.feedbacks, public.teacher_assignments, public.teacher_subjects,
   public.auth_sessions, public.admin_operations,
-  public.reveal_permissions, public.reveal_requests TO echora_app;
+  public.reveal_permissions, public.reveal_requests, public.maya_analyses,
+  public.maya_conversations, public.maya_questions, public.maya_daily_quotas TO echora_app;
 -- INSERT RETURNING do ORM precisa somente destas colunas de auditoria.
 GRANT SELECT (id, created_at) ON TABLE public.audit_events TO echora_app;
 
@@ -59,6 +60,8 @@ GRANT INSERT, UPDATE ON TABLE public.auth_sessions TO echora_app;
 -- Auditoria e idempotência são somente inserção; permissões de revelação, só leitura.
 GRANT INSERT ON TABLE public.audit_events, public.admin_operations TO echora_app;
 GRANT INSERT, UPDATE ON TABLE public.reveal_requests TO echora_app;
+GRANT INSERT ON TABLE public.maya_analyses, public.maya_conversations TO echora_app;
+GRANT INSERT, UPDATE ON TABLE public.maya_questions, public.maya_daily_quotas TO echora_app;
 
 -- Somente sequências efetivamente usadas pelas inserções da aplicação.
 GRANT USAGE, SELECT ON SEQUENCE public.schools_id_seq, public.classrooms_id_seq,

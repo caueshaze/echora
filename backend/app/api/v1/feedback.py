@@ -12,6 +12,8 @@ from ...core.crypto import encrypt_feedback
 from ...core.database import get_session
 from ...core.security import get_current_user, require_role
 from ...core.rate_limit import admin_summary_rate_limit, get_rate_limiter, summary_rate_key
+from ...services.maya_service import create_analysis
+from ...services.access_control import resolve_school_assignment
 from ...core.sentiment import analyze_sentiment
 from ...core.triggers import detect_triggers, load_trigger_keywords
 from ...core.llm import (
@@ -666,7 +668,11 @@ def summarize_my_feedbacks(
     current_user: UserPublic = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> FeedbackSummary:
-    return generate_personal_summary(db=db, current_user=current_user)
+    metadata = {}
+    result = generate_personal_summary(db=db, current_user=current_user, metadata_out=metadata)
+    if current_user.role in ('aluno', 'professor'):
+        create_analysis(db, current_user, result.summary_text, current_user.role, current_user.school_id, metadata)
+    return result
 
 
 @router.get(
@@ -682,4 +688,8 @@ def summarize_all_feedbacks(
     db: Session = Depends(get_session),
     school_id: int | None = Query(default=None, gt=0, description="Unidade escolar do resumo"),
 ) -> FeedbackSummary:
-    return generate_admin_summary(db=db, current_user=current_user, school_id=school_id)
+    metadata = {}
+    result = generate_admin_summary(db=db, current_user=current_user, school_id=school_id, metadata_out=metadata)
+    create_analysis(db, current_user, result.summary_text, 'institucional',
+                    resolve_school_assignment(current_user, school_id), metadata)
+    return result

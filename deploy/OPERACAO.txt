@@ -38,6 +38,10 @@ SUMMARY_ADMIN_REQUESTS_PER_HOUR define o limite de requisições do Relatório
 Executivo por usuário e hora (padrão 3); solicitações que falham também contam.
 Para testes, ajuste esse valor em .env.prod e recrie o backend. Retorne-o a um
 valor adequado depois dos testes; cada geração pode gerar chamadas tarifadas.
+MAYA_DAILY_QUESTION_LIMIT controla perguntas por usuário e dia (padrão 5), com
+renovação à meia-noite em America/Sao_Paulo. Reservas de chamadas sem resposta
+são liberadas em caso de falha ou após cinco minutos se o processo for perdido.
+O limite de sínteses pessoais permanece em três por hora por usuário.
 
 Comandos posteriores na VPS, após verificar colisões e IPs:
   docker network create --internal --subnet 172.30.86.0/24 echora_proxy
@@ -94,7 +98,7 @@ os comandos de scripts/reveal_permission.py e scripts/compact_admin_operations.p
 Não use usuário migrador ou superusuário para requisições da aplicação.
 Somente após migração, grants e verificação dos privilégios, inicie a API e o frontend:
   docker compose --env-file deploy/compose.env -f compose.prod.yml up -d backend frontend
-O script de grants lista as 15 tabelas da revisão atual; uma tabela nova não
+O script de grants lista as tabelas da revisão atual; uma tabela nova não
 recebe escrita até ser adicionada explicitamente. Se uma tabela esperada não
 existir, o script falha e reverte a transação. O backup pode ler tabelas novas.
 

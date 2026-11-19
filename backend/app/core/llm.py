@@ -218,7 +218,8 @@ def measure_llm_latency(prompt_text: str = "Gere um breve resumo positivo.", max
 _OPENAI_GPT5_NANO_MODELS = {'gpt-5-nano', 'gpt-5-nano-2025-08-07'}
 
 
-def _run_openai(prompt_text: str, *, institutional: bool = False) -> str:
+def _run_openai(prompt_text: str, *, institutional: bool = False,
+                system_prompt: str | None = None, budgets_override: tuple[int, int] | None = None) -> str:
     """Generate a summary with at most two bounded, billable requests."""
     settings = get_settings()
     api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "").strip()
@@ -232,7 +233,7 @@ def _run_openai(prompt_text: str, *, institutional: bool = False) -> str:
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": (
+            {"role": "system", "content": system_prompt or (
                 "Você é Maya, analista de inteligência educacional da Echora. Produza análises institucionais objetivas, fundamentadas e respeitosas em português do Brasil."
                 if institutional else
                 "Você é Maya, uma mentora empática, acolhedora e otimista da plataforma educacional Echora. "
@@ -247,8 +248,8 @@ def _run_openai(prompt_text: str, *, institutional: bool = False) -> str:
         payload['reasoning_effort'] = 'minimal'
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     # OpenAI budgets include reasoning and visible output, unlike Gemma's limit.
-    budgets = (settings.summary_openai_max_completion_tokens,
-               settings.summary_openai_retry_max_completion_tokens)
+    budgets = budgets_override or (settings.summary_openai_max_completion_tokens,
+                                   settings.summary_openai_retry_max_completion_tokens)
 
     with httpx.Client(timeout=45.0, follow_redirects=False) as client:
         for attempt, budget in enumerate(budgets, 1):
@@ -512,8 +513,13 @@ def _summarize_feedbacks(
     subject: str,
     audience: str,
     limit: int = 50,
+    metadata_out: dict | None = None,
 ) -> FeedbackSummary:
     feedbacks = list(_fetch_feedbacks(db, where_clause=where_clause, limit=limit))
+    if metadata_out is not None:
+        dates = [fb.created_at.date() for fb in feedbacks if fb.created_at is not None]
+        metadata_out.update(count=len(feedbacks), period_start=min(dates) if dates and len(dates) == len(feedbacks) else None,
+                            period_end=max(dates) if dates and len(dates) == len(feedbacks) else None)
     empty_message = ("Ainda não há relatos suficientes para uma análise fundamentada."
                      if audience == "gestor" else
                      "Ainda não há feedbacks suficientes para eu oferecer uma orientação fundamentada.")
@@ -587,6 +593,7 @@ def _summarize_feedbacks(
 def generate_personal_summary(
     db: Session,
     current_user: UserPublic,
+    metadata_out: dict | None = None,
 ) -> FeedbackSummary:
     user_id = str(current_user.id)
     subject = current_user.full_name or current_user.email or "você"
@@ -600,13 +607,14 @@ def generate_personal_summary(
         audience = "usuário"
 
     where_clause = and_(Feedback.target_type == "user", Feedback.target_id == user_id)
-    return _summarize_feedbacks(db, where_clause, subject, audience)
+    return _summarize_feedbacks(db, where_clause, subject, audience, metadata_out=metadata_out)
 
 
 def generate_admin_summary(
     db: Session,
     current_user: UserPublic,
     school_id: Optional[int] = None,
+    metadata_out: dict | None = None,
 ) -> FeedbackSummary:
     if current_user.role not in ("admin", "gestor"):
         raise HTTPException(status_code=403, detail="Perfil sem permissão para acessar resumos")
@@ -624,4 +632,4 @@ def generate_admin_summary(
         and_(Feedback.target_type == "class", exists(select(Classroom.id).where(cast(Classroom.id, String) == Feedback.target_id, Classroom.school_id == school_id))),
     )
     where_clause = and_(sender_in_school, target_in_school)
-    return _summarize_feedbacks(db, where_clause, subject, audience)
+    return _summarize_feedbacks(db, where_clause, subject, audience, metadata_out=metadata_out)
