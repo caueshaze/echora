@@ -23,7 +23,7 @@ export function PersonalSummaryCard({
             <span>Síntese Assistida</span>
           </div>
           <h2 className="text-base sm:text-lg font-semibold text-slate-900">
-            Leitura consolidada dos feedbacks
+            Mensagem da Maya
           </h2>
           <p className="text-sm text-slate-500">
             Agrupa os pontos recorrentes dos relatos recebidos em uma leitura rápida.
@@ -52,22 +52,7 @@ export function PersonalSummaryCard({
             {summary.summary_text}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {summary.positives.length > 0 && (
-              <InsightList
-                title="Pontos elogiados"
-                items={summary.positives}
-                tone="positive"
-              />
-            )}
-            {summary.opportunities.length > 0 && (
-              <InsightList
-                title="Oportunidades de ajuste"
-                items={summary.opportunities}
-                tone="attention"
-              />
-            )}
-          </div>
+
         </div>
       )}
 
@@ -77,30 +62,5 @@ export function PersonalSummaryCard({
         </div>
       )}
     </section>
-  )
-}
-
-function InsightList({
-  title,
-  items,
-  tone,
-}: {
-  title: string
-  items: string[]
-  tone: 'positive' | 'attention'
-}) {
-  const dotColor = tone === 'positive' ? 'bg-emerald-500' : 'bg-amber-500'
-  return (
-    <div className="rounded-lg border border-slate-200/80 p-4 space-y-2 bg-white">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</p>
-      <ul className="space-y-2 text-sm text-slate-700">
-        {items.map((item, index) => (
-          <li key={`${title}-${index}`} className="flex items-start gap-2">
-            <span className={`h-1.5 w-1.5 rounded-full ${dotColor} mt-2 shrink-0`} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   )
 }

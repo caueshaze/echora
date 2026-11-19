@@ -4,6 +4,8 @@ import { ArrowLeft, Eye, EyeOff, Lock, Users } from 'lucide-react'
 
 import { EchoraLogo } from '../components/brand/EchoraLogo'
 import { useAuth, Role } from '../context/AuthContext'
+import { API_BASE_URL } from '../lib/config'
+import { clearToken, getToken } from '../lib/auth'
 
 const redirectMap: Record<Role, string> = {
   aluno: '/aluno',
@@ -13,7 +15,7 @@ const redirectMap: Record<Role, string> = {
 }
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, refresh } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({ username: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -22,6 +24,8 @@ export default function Login() {
     text: string
   } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target
@@ -42,13 +46,41 @@ export default function Login() {
     setIsLoading(true)
     setStatusMessage({ type: 'info', text: 'Entrando...' })
     try {
-      const resolvedRole = await login(normalizedEmail, normalizedPassword)
-      navigate(redirectMap[resolvedRole] ?? '/')
+      const result = await login(normalizedEmail, normalizedPassword)
+      if (result.mustChangePassword) {
+        setMustChangePassword(true)
+        setStatusMessage({ type: 'info', text: 'Defina uma nova senha para continuar.' })
+      } else {
+        navigate(redirectMap[result.role] ?? '/')
+      }
     } catch (error: any) {
       setStatusMessage({
         type: 'error',
         text: error?.message || 'E-mail ou senha incorretos. Confira os dados e tente novamente.',
       })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setIsLoading(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ current_password: formData.password, new_password: newPassword }),
+      })
+      if (!response.ok) throw new Error('Não foi possível alterar a senha. Confira os requisitos e tente novamente.')
+      clearToken()
+      await refresh()
+      setMustChangePassword(false)
+      setNewPassword('')
+      setFormData((current) => ({ ...current, password: '' }))
+      setStatusMessage({ type: 'info', text: 'Senha alterada. Entre novamente com a nova senha.' })
+    } catch (error: any) {
+      setStatusMessage({ type: 'error', text: error?.message || 'Não foi possível alterar a senha.' })
     } finally {
       setIsLoading(false)
     }
@@ -87,7 +119,7 @@ export default function Login() {
             </p>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={mustChangePassword ? handleChangePassword : handleSubmit}>
             <div>
               <label htmlFor="username" className="label">
                 E-mail
@@ -102,7 +134,7 @@ export default function Login() {
                 value={formData.username}
                 onChange={handleInputChange}
                 required
-                disabled={isLoading}
+                disabled={isLoading || mustChangePassword}
               />
             </div>
 
@@ -121,7 +153,7 @@ export default function Login() {
                   value={formData.password}
                   onChange={handleInputChange}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || mustChangePassword}
                 />
                 <button
                   type="button"
@@ -134,6 +166,15 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            {mustChangePassword && (
+              <div>
+                <label htmlFor="new-password" className="label">Nova senha</label>
+                <input id="new-password" type="password" autoComplete="new-password" className="input"
+                  minLength={12} maxLength={72} required value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)} disabled={isLoading} />
+              </div>
+            )}
 
             {statusMessage && (
               <div
@@ -148,7 +189,7 @@ export default function Login() {
             )}
 
             <button type="submit" className="btn w-full py-3 shadow-xs" disabled={isLoading}>
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? 'Aguarde...' : mustChangePassword ? 'Alterar senha' : 'Entrar'}
             </button>
           </form>
 

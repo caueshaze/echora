@@ -40,7 +40,7 @@ class AuthenticationSessionTests(unittest.TestCase):
         app.include_router(router, prefix='/api/v1')
         app.dependency_overrides[get_session] = lambda: self.db
         app.dependency_overrides[get_settings] = lambda: self.settings
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers={'Origin': 'http://localhost:5173', 'X-Echora-CSRF': '1'})
 
     def tearDown(self):
         self.db.close()
@@ -110,3 +110,25 @@ class AuthenticationSessionTests(unittest.TestCase):
         for _ in range(4):
             self.assertEqual(self.client.post('/api/v1/auth/login', json={'email': self.user.email, 'password': 'wrongpass'}).status_code, 401)
         self.assertEqual(self.client.post('/api/v1/auth/login', json={'email': self.user.email, 'password': 'wrongpass'}).status_code, 429)
+
+    def test_cookie_endpoints_require_origin_and_csrf_header(self):
+        self.login()
+        for path in ('/api/v1/auth/refresh', '/api/v1/auth/logout'):
+            for headers in ({'Origin': 'null', 'X-Echora-CSRF': '1'},
+                            {'Origin': 'https://evil.example', 'X-Echora-CSRF': '1'},
+                            {'Origin': 'http://localhost:5173', 'X-Echora-CSRF': ''},
+                            {'Origin': '', 'X-Echora-CSRF': '1'}):
+                with self.subTest(path=path, headers=headers):
+                    self.assertEqual(self.client.post(path, headers=headers).status_code, 403)
+        response = self.client.post('/api/v1/auth/refresh')
+        self.assertEqual(response.status_code, 200)
+
+    def test_same_origin_web_login(self):
+        self.settings.cors_origins = 'http://testserver'
+        response = self.client.post('/api/v1/auth/login',
+                                    headers={'Origin': 'http://testserver', 'X-Echora-CSRF': '1'},
+                                    json={'email': self.user.email, 'password': 'secret123'})
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post('/api/v1/auth/refresh',
+                                    headers={'Origin': 'http://testserver', 'X-Echora-CSRF': '1'})
+        self.assertEqual(response.status_code, 200)

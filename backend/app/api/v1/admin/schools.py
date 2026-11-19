@@ -11,8 +11,10 @@ from ....models import Classroom, School, Subject, User
 from ....schemas.school import SchoolCreate, SchoolPublic, SchoolUpdate
 from ....schemas.user import UserPublic
 from .deps import manager_school_or_error, require_admin_user
+from .audit_route import AuditedAdminRoute
+from ....services.audit_service import record_event
 
-router = APIRouter(prefix="/schools")
+router = APIRouter(prefix="/schools", route_class=AuditedAdminRoute)
 
 
 @router.post(
@@ -23,7 +25,7 @@ router = APIRouter(prefix="/schools")
 )
 def create_school(
     payload: SchoolCreate,
-    _: UserPublic = Depends(require_admin_user("admin")),
+    current_user: UserPublic = Depends(require_admin_user("admin")),
     db: Session = Depends(get_session),
 ) -> SchoolPublic:
     if db.scalar(select(func.count()).where(School.name == payload.name)):
@@ -49,6 +51,8 @@ def create_school(
         state=payload.state,
     )
     db.add(school)
+    db.flush()
+    record_event(db, actor=current_user, action='school.create', resource_type='school', resource_id=school.id, school_id=school.id)
     db.commit()
     db.refresh(school)
     return SchoolPublic.model_validate(school)
@@ -78,7 +82,7 @@ def list_schools(
 def update_school(
     school_id: int,
     payload: SchoolUpdate,
-    _: UserPublic = Depends(require_admin_user("admin")),
+    current_user: UserPublic = Depends(require_admin_user("admin")),
     db: Session = Depends(get_session),
 ) -> SchoolPublic:
     school = db.get(School, school_id)
@@ -125,6 +129,7 @@ def update_school(
     ):
         setattr(school, field, getattr(payload, field))
     db.add(school)
+    record_event(db, actor=current_user, action='school.update', resource_type='school', resource_id=school.id, school_id=school.id)
     db.commit()
     db.refresh(school)
     return SchoolPublic.model_validate(school)
@@ -137,7 +142,7 @@ def update_school(
 )
 def delete_school(
     school_id: int,
-    _: UserPublic = Depends(require_admin_user("admin")),
+    current_user: UserPublic = Depends(require_admin_user("admin")),
     db: Session = Depends(get_session),
 ) -> None:
     school = db.get(School, school_id)
@@ -160,5 +165,6 @@ def delete_school(
             status_code=status.HTTP_409_CONFLICT,
             detail="Não é possível remover: existem registros dependentes",
         )
+    record_event(db, actor=current_user, action='school.delete', resource_type='school', resource_id=school.id, school_id=school.id)
     db.delete(school)
     db.commit()

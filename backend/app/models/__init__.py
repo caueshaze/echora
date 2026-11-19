@@ -6,6 +6,9 @@ from .assignment import TeacherAssignment
 from .feedback import Feedback
 from .trigger import TriggerKeyword
 from .auth_session import AuthSession
+from .audit_event import AuditEvent
+from .reveal import RevealPermission, RevealRequest
+from .idempotency import AdminOperation
 
 __all__ = [
     "User",
@@ -16,4 +19,8 @@ __all__ = [
     "Feedback",
     "TriggerKeyword",
     "AuthSession",
+    "AuditEvent",
+    "RevealPermission",
+    "RevealRequest",
+    "AdminOperation",
 ]

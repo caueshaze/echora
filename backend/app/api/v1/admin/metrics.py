@@ -15,8 +15,9 @@ from ....models import Classroom, Feedback, School, Subject, User
 from ....schemas.admin_metrics import AdminHealthMetrics, AdminMetricsOverview
 from ....schemas.user import UserPublic
 from .deps import require_admin_user
+from .audit_route import AuditedAdminRoute
 
-router = APIRouter(prefix="/metrics")
+router = APIRouter(prefix="/metrics", route_class=AuditedAdminRoute)
 
 
 def _measure_onnx_latency() -> float | None:

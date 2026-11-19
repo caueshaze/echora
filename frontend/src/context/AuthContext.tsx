@@ -25,12 +25,13 @@ type Session = {
   schoolId: number | null
   classroomId: number | null
   subjectId: number | null
+  mustChangePassword: boolean
 } | null
 
 type AuthCtx = {
   session: Session
   loading: boolean
-  login: (email: string, password: string) => Promise<Role>
+  login: (email: string, password: string) => Promise<{ role: Role; mustChangePassword: boolean }>
   logout: () => void
   refresh: () => Promise<Session | null>
 }
@@ -61,6 +62,7 @@ function normalizeSession(user: Awaited<ReturnType<typeof fetchCurrentUser>>): S
     schoolId: typeof user.school_id === 'number' ? user.school_id : null,
     classroomId: typeof user.classroom_id === 'number' ? user.classroom_id : null,
     subjectId: typeof user.subject_id === 'number' ? user.subject_id : null,
+    mustChangePassword: Boolean(user.must_change_password),
   }
 }
 
@@ -114,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            'X-Echora-CSRF': '1',
           },
           body: JSON.stringify({ email: normalizedEmail, password: normalizedPassword }),
         })
@@ -133,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error('Não foi possível carregar seu perfil.')
         }
 
-        return newSession.role
+        return { role: newSession.role, mustChangePassword: newSession.mustChangePassword }
       } catch (error: any) {
         clearToken()
         setSession(null)

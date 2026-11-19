@@ -112,8 +112,13 @@ def get_current_user(
     if not user:
         raise AuthenticationError("Usuário não encontrado")
 
+    if user.must_change_password and request.url.path not in {'/api/v1/auth/me', '/api/v1/auth/change-password'}:
+        raise HTTPException(status_code=403, detail='Troca de senha obrigatória')
+
     request.state.user_id = user.id
-    return UserPublic.model_validate(user)
+    current_user = UserPublic.model_validate(user)
+    request.state.audit_actor = current_user
+    return current_user
 
 def require_role(*roles: str) -> Callable[[UserPublic], UserPublic]:
     """Build a dependency that ensures the current user owns one of the allowed roles."""

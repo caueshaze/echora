@@ -13,8 +13,10 @@ from ....models import TriggerKeyword
 from ....schemas.trigger import TriggerKeywordCreate, TriggerKeywordPublic
 from ....schemas.user import UserPublic
 from .deps import manager_school_or_error, require_admin_user
+from ....services.audit_service import record_event
+from .audit_route import AuditedAdminRoute
 
-router = APIRouter(prefix="/trigger_keywords")
+router = APIRouter(prefix="/trigger_keywords", route_class=AuditedAdminRoute)
 
 
 def _resolve_keyword_scope(current_user: UserPublic, requested_school: Optional[int]) -> Optional[int]:
@@ -81,6 +83,9 @@ def create_trigger_keyword(
         )
     keyword = TriggerKeyword(keyword=keyword_normalized, school_id=resolved_school_id)
     db.add(keyword)
+    db.flush()
+    record_event(db, actor=current_user, action='trigger.create', resource_type='trigger',
+                 resource_id=keyword.id, school_id=keyword.school_id)
     db.commit()
     db.refresh(keyword)
     return TriggerKeywordPublic.model_validate(keyword)
@@ -109,5 +114,7 @@ def delete_trigger_keyword(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Gestores só podem remover palavras da própria unidade",
             )
+    record_event(db, actor=current_user, action='trigger.delete', resource_type='trigger',
+                 resource_id=keyword.id, school_id=keyword.school_id)
     db.delete(keyword)
     db.commit()

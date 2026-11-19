@@ -1,0 +1,150 @@
+ECHORA — PREPARAÇÃO DA IMPLANTAÇÃO (não executada)
+
+Pré-requisitos: Docker Engine e Compose v5.1.4, DNS A/AAAA correto, GPG e
+backups externos. Execute de uma cópia revisada em /srv/echora. Nunca use
+compose down -v; os volumes contêm banco, Redis e logs. Faça backup e teste
+restauração antes de alterar dados. Redes 172.30.86.0/24 e 172.30.87.0/24
+são exemplos fixos: confirme que não colidem com qualquer rede existente.
+As imagens-base usam versão e digest fixos; requirements.lock fixa versões
+diretas e transitivas do Python, e npm ci usa package-lock.json. O lock Python
+não contém hashes de todos os artefatos: não garante build hermético ou
+autenticidade imutável dos wheels. Registre hashes em repositório confiável
+e revise versões e avisos de segurança antes da implantação. O build de
+referência foi preparado para Linux x86-64; valide wheels para outra arquitetura.
+
+1. SEGREDOS E REDES
+Copie deploy/compose.env.example para deploy/compose.env (chmod 600) e
+.env.prod.example para .env.prod (chmod 600). Gere senhas únicas aleatórias.
+A primeira contém POSTGRES_PASSWORD e REDIS_PASSWORD; a segunda apenas os
+segredos da aplicação: APP_ENV=production, DEBUG=false,
+CORS_ORIGINS=https://echora.caueti.com, LOG_DIR=/app/logs,
+DATABASE_URL=postgresql+psycopg://echora_app:<SENHA_URL_ENCODED>@postgres:5432/echora,
+RATE_LIMIT_STORAGE_URI=redis://:<SENHA_URL_ENCODED>@redis:6379/0,
+SECRET_KEY e DATA_ENCRYPTION_KEY independentes e fortes. A senha Redis deve
+coincidir com REDIS_PASSWORD. Configure OpenAI apenas se usada; nunca salve
+senha de administrador do banco, migração ou backup no arquivo da aplicação.
+A imagem não inclui pesos locais: ./models é montado somente para leitura.
+Sem ONNX usa heurística; instale modelos confiáveis com proprietário e
+permissões que impeçam escrita por usuários da aplicação. Gemma exige memória
+e modelo local; confira dependências e tamanho antes de ativá-lo.
+
+Comandos posteriores na VPS, após verificar colisões e IPs:
+  docker network create --internal --subnet 172.30.86.0/24 echora_proxy
+  docker network connect --ip 172.30.86.2 echora_proxy <NOME_CADDY_EXISTENTE>
+Não remova ou reconecte presumidos_origin: o Caddy mantém 172.31.0.10.
+Somente Caddy e frontend devem ingressar em echora_proxy. Confirme com
+  docker network inspect echora_proxy
+  docker network inspect presumidos_origin
+O Caddyfile.echora é fragmento, não sobrescreve o arquivo existente. Faça
+backup do Caddyfile real; incorpore seu conteúdo com procedimento revisado,
+preservando o bloco Presumidos byte a byte. O fragmento importado precisa
+estar acessível no contêiner: se o Caddyfile existente for um bind mount de
+arquivo único, um novo mount exige recriação; uma alternativa é incorporar o
+fragmento ao arquivo montado após backup, sem modificar o bloco existente.
+Não execute essas alterações nesta preparação. Antes de reload execute:
+  docker exec <NOME_CADDY_EXISTENTE> caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  docker exec <NOME_CADDY_EXISTENTE> caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+Confirme primeiro o caminho real do Caddyfile no contêiner; aponte os comandos
+a ele. Valide o arquivo completo antes do reload; Caddy 2.10.2 executa HTTPS.
+
+2. BUILD E BANCO
+  docker compose --env-file deploy/compose.env -f compose.prod.yml config -q
+  docker compose --env-file deploy/compose.env -f compose.prod.yml build --pull
+  docker compose --env-file deploy/compose.env -f compose.prod.yml up -d postgres redis
+  docker compose --env-file deploy/compose.env -f compose.prod.yml ps
+Inicialização do postgres cria apenas echora_owner como superusuário inicial.
+Este usuário é exclusivamente de administração; nunca use na aplicação.
+No banco vazio, execute o provisionamento reaplicável como proprietário:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U echora_owner -d echora < deploy/postgres-roles.sql
+Depois entre interativamente no psql, sob controle do operador:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml exec postgres psql -U echora_owner -d echora
+Defina senhas únicas interativamente:
+  \password echora_migrator
+  \password echora_app
+  \password echora_backup
+  \q
+O usuário de backup recebe somente SELECT nas tabelas e sequências do esquema
+public deste banco; não deve possuir CREATE/UPDATE/DELETE.
+Configure DATABASE_URL com echora_app em .env.prod, mas não inicie a API ainda.
+No terminal do operador, carregue MIGRATION_DATABASE_URL no ambiente protegido
+com echora_migrator e senha codificada. Execute a migração em contêiner avulso:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml run --rm --no-deps -e MIGRATION_DATABASE_URL backend alembic upgrade head
+  docker compose --env-file deploy/compose.env -f compose.prod.yml run --rm --no-deps -e MIGRATION_DATABASE_URL backend alembic current
+Após CADA migração, aplique os grants reaplicáveis:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U echora_owner -d echora < deploy/postgres-grants.sql
+Verifique os privilégios efetivos antes de iniciar a API:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml exec -T postgres psql -U echora_owner -d echora -c "SELECT has_schema_privilege('echora_app','public','CREATE') AS app_create, has_table_privilege('echora_app','audit_events','UPDATE') AS audit_update, has_table_privilege('echora_app','reveal_permissions','INSERT') AS reveal_grant, has_table_privilege('echora_backup','feedbacks','SELECT') AS backup_read, has_table_privilege('echora_backup','feedbacks','DELETE') AS backup_delete;"
+Os resultados esperados são false, false, false, true, false. Verifique também
+propriedade e privilégios herdados: a conta da app não pode ser proprietária
+de tabelas ou ter CREATE. Execute pg_dump com a conta de backup e teste a
+restauração isolada antes de liberar a API. Crie credenciais
+operacionais individuais para permissões de revelação e compactação conforme
+os comandos de scripts/reveal_permission.py e scripts/compact_admin_operations.py.
+Não use usuário migrador ou superusuário para requisições da aplicação.
+Somente após migração, grants e verificação dos privilégios, inicie a API e o frontend:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml up -d backend frontend
+O script de grants lista as 15 tabelas da revisão atual; uma tabela nova não
+recebe escrita até ser adicionada explicitamente. Se uma tabela esperada não
+existir, o script falha e reverte a transação. O backup pode ler tabelas novas.
+
+3. PRIMEIRO ADMINISTRADOR
+Use conexão operacional restrita separada; ela requer SELECT/INSERT em users,
+INSERT em audit_events e permissões nas sequências. Com a URL exportada:
+  docker compose --env-file deploy/compose.env -f compose.prod.yml exec -e MIGRATION_DATABASE_URL backend python -m scripts.bootstrap_admin --email admin@exemplo.org --name 'Administrador'
+O comando solicita senha interativamente, somente se não existir administrador
+global. Exige troca no primeiro login e revoga suas sessões após a troca.
+Não concede permissão de revelação. Nunca automatize no startup. Remova a URL
+operacional do ambiente da aplicação; unset MIGRATION_DATABASE_URL no terminal.
+
+4. BACKUP E RESTAURAÇÃO
+Importe e confira a chave pública GPG do destinatário. No host configure
+ECHORA_BACKUP_DIR, ECHORA_BACKUP_RECIPIENT e PGPASSWORD (conta echora_backup)
+no ambiente protegido, então execute deploy/backup-postgresql.sh. O dump é
+compactado pelo PostgreSQL e criptografado em fluxo; pipefail impede publicar
+arquivo parcial. Guarde cópias fora da VPS; proteja e teste a chave privada.
+Teste restauração SOMENTE em banco descartável e isolado, criado pelo operador:
+  gpg --decrypt /caminho/backup.dump.gpg | docker compose --env-file deploy/compose.env -f compose.prod.yml exec -T --user 70:70 -e PGPASSWORD postgres pg_restore -h 127.0.0.1 -U echora_migrator -d echora_restore --no-owner --no-acl --exit-on-error
+Crie echora_restore previamente em instância isolada; confirme DATABASE e host
+antes de executar. Compare contagens, migrações, usuários e descriptografia;
+reaplique grants. A chave DATA_ENCRYPTION_KEY é indispensável para restauração.
+Restaurar sobre banco ativo requer procedimento e janela separados.
+
+5. VALIDAÇÃO E OPERAÇÃO
+  docker compose --env-file deploy/compose.env -f compose.prod.yml ps
+  docker compose --env-file deploy/compose.env -f compose.prod.yml logs --tail=100 backend
+  curl -I https://echora.caueti.com/
+  curl -i https://echora.caueti.com/api/v1/predict/health
+  curl -i https://echora.caueti.com/docs
+  curl -i https://echora.caueti.com/openapi.json
+  curl -i https://echora.caueti.com/redoc
+Confirme certificado e DNS (dig +short echora.caueti.com), redirecionamento
+HTTPS, CSP e cabeçalhos. Documentação deve retornar 404; health protegido
+retorna 401 sem token. Teste login, cookies Secure/HttpOnly/SameSite=Strict,
+refresh/logout, CSRF e origens autorizadas/rejeitadas, isolamento escolar,
+rate limiting Redis e expiração. Sem tráfego tarifado nos healthchecks.
+Inspecione redes: frontend só proxy/app; PostgreSQL e Redis só data; Caddy
+não alcança data. Confirme ausência de portas publicadas com docker inspect.
+O backend confia apenas no IP 172.30.87.2 do frontend; nginx aceita cliente
+real apenas de 172.30.86.2 (Caddy). Não conecte outras cargas às redes.
+Caddy deve continuar removendo X-Forwarded-* fornecidos por clientes não
+confiáveis. Teste IP falsificado e logs/limites antes de GO.
+O fragmento Caddy substitui X-Forwarded-For pelo endereço do socket cliente;
+isso pressupõe conexão direta de clientes ao Caddy, sem CDN ou proxy anterior.
+O Nginx aceita o cabeçalho apenas de 172.30.86.2 e repassa exatamente um IP;
+Uvicorn aceita encaminhamento apenas de 172.30.87.2. Confirme ambos via
+docker network inspect antes de liberar tráfego. Teste tanto IP real quanto
+X-Forwarded-For forjado. A rede egress é necessária para chamadas HTTPS à
+OpenAI ou serviço remoto de sentimento; modelos locais não precisam dela.
+O healthcheck privado /health/ready executa SELECT 1 e Redis PING, sem revelar
+detalhes; /openapi.json deve ser testado separadamente como 404.
+
+Atualização: backup testado, build revisado, migração explícita, depois up -d;
+não use down -v. Para rollback preserve volumes, volte imagem/configuração e
+Caddyfile conhecidos; confirme compatibilidade da migração antes de reverter
+código e restaure em ambiente isolado quando necessário. Rotacione segredos de
+forma coordenada: SECRET_KEY invalida JWTs e muda fingerprints de idempotência;
+chaves de dados requerem migração versionada antes de remover chave antiga.
+Alterar senha Redis ou PostgreSQL exige atualização sincronizada de URLs e
+serviços; ALTER ROLE muda senha no banco, alterar POSTGRES_PASSWORD após o
+primeiro volume NÃO a altera. Auditorias, atualização de dependências e testes
+na VPS são obrigatórios antes de declarar produção pronta.

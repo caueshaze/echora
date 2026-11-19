@@ -202,6 +202,8 @@ def _run_sqlite_migrations(engine: Engine) -> None:
         user_columns = {
             row[1] for row in connection.execute(text("PRAGMA table_info('users')"))
         }
+        if "must_change_password" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"))
         if "classroom_id" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN classroom_id INTEGER"))
         if "subject_id" not in user_columns:

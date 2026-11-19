@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class SchoolBase(BaseModel):
@@ -15,7 +15,7 @@ class SchoolBase(BaseModel):
     description: Optional[str] = Field(
         default=None, description="Resumo ou observações sobre a unidade"
     )
-    contact_email: Optional[str] = Field(
+    contact_email: Optional[EmailStr] = Field(
         default=None, description="E-mail institucional para contato", max_length=255
     )
     contact_phone: Optional[str] = Field(

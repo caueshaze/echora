@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, or_, select, update
@@ -24,6 +25,7 @@ from .organization_service import (
     require_subject,
 )
 from .feedback_access import eligible_user_target_clause
+from .audit_service import record_event
 
 
 def _validate_role_password(password: str, role: str, email: str) -> None:
@@ -123,6 +125,9 @@ def create_user(
         new_user.teachable_subjects = teachable_subjects
 
     db.add(new_user)
+    db.flush()
+    record_event(db, actor=current_user, action='user.create', resource_type='user',
+                 resource_id=new_user.id, school_id=new_user.school_id)
     db.commit()
     db.refresh(new_user)
     return new_user
@@ -253,6 +258,15 @@ def update_user(
     if payload.password or target_role != previous_role or user.school_id != previous_school_id:
         db.execute(update(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)).values(revoked_at=datetime.now(timezone.utc)))
     db.add(user)
+    operation_id = db.info.get('audit_operation_id') or str(uuid4())
+    record_event(db, actor=current_user, action='user.update', resource_type='user',
+                 resource_id=user.id, school_id=user.school_id, operation_id=operation_id)
+    for condition, action in ((bool(payload.password), 'user.password_reset'),
+                              (target_role != previous_role, 'user.role_change'),
+                              (user.school_id != previous_school_id, 'user.school_change')):
+        if condition:
+            record_event(db, actor=current_user, action=action, resource_type='user',
+                         resource_id=user.id, school_id=user.school_id, operation_id=operation_id)
     db.commit()
     db.refresh(user)
     return user
@@ -348,5 +362,7 @@ def delete_user(db: Session, user_id: str, current_user: UserPublic) -> None:
             Feedback.target_id == user_id,
         )
     )
+    record_event(db, actor=current_user, action='user.delete', resource_type='user',
+                 resource_id=user.id, school_id=user.school_id)
     db.delete(user)
     db.commit()

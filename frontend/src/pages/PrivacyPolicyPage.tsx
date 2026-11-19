@@ -16,6 +16,8 @@ const dataInventory = [
       'Mensagens enviadas e recebidas armazenadas sob criptografia AES-256-GCM.',
       'Indicadores automáticos de sentimento e sinalização preventiva de risco.',
       'Registro de encaminhamento e conclusão de alertas pela coordenação.',
+      'Em relatos anônimos, a identidade não aparece nas consultas comuns. Em situações excepcionais de ameaça concreta à segurança, a identidade poderá ser consultada após justificativa, aprovação de outro administrador autorizado e registro de auditoria.',
+      'O anonimato nas telas não impede que o próprio conteúdo ou as circunstâncias de um relato permitam identificar alguém.',
       'Quando a síntese por IA é solicitada, trechos dos relatos são enviados ao provedor de IA configurado, que pode processá-los fora do Brasil.',
     ],
   },

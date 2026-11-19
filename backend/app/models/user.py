@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func, and_
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func, and_, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from ..core.database import Base
@@ -39,6 +39,7 @@ class User(Base):
         ForeignKey("classrooms.id"), nullable=True
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

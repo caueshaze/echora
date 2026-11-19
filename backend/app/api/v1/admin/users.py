@@ -10,8 +10,9 @@ from ....models import User
 from ....schemas.user import UserCreate, UserPublic, UserRecipient, UserUpdate
 from ....services import user_service
 from .deps import enforce_manageable_role, normalize_role_param, require_admin_user
+from .audit_route import AuditedAdminRoute
 
-router = APIRouter(prefix="/users")
+router = APIRouter(prefix="/users", route_class=AuditedAdminRoute)
 
 
 @router.post(

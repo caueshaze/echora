@@ -1,0 +1,107 @@
+name: echora
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    image: echora-backend:local
+    env_file: [./.env.prod]
+    environment:
+      APP_ENV: production
+      DEBUG: 'false'
+      LOG_DIR: /app/logs
+    networks:
+      app:
+        ipv4_address: 172.30.87.3
+      data: {}
+      egress:
+        gw_priority: 1
+    volumes:
+      - echora_logs:/app/logs
+      - ./models:/app/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 3g
+    pids_limit: 512
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    image: echora-frontend:local
+    networks:
+      proxy:
+        aliases: [echora-web]
+      app:
+        ipv4_address: 172.30.87.2
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 128
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  postgres:
+    image: postgres:16.16-alpine3.24@sha256:9d9e487c1bd6413c52ccb3c02f46c8e37fa1e1d1a32a84519eb4e68d0ad1da30
+    environment:
+      POSTGRES_USER: echora_owner
+      POSTGRES_DB: echora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - echora_pg:/var/lib/postgresql/data
+    networks: [data]
+    restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 256
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U echora_owner -d echora']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7.4.12-alpine@sha256:e4ee3e03ce8f75471f40937a7c6b2b0e500390b6812fcdf5cb32c01295ded446
+    user: '999:1000'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?defina REDIS_PASSWORD}
+    command: [sh, -c, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes:
+      - echora_redis:/data
+    networks: [data]
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 128
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  proxy:
+    external: true
+    name: echora_proxy
+  app:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.87.0/24
+  data:
+    internal: true
+  egress: {}
+volumes:
+  echora_pg: {}
+  echora_redis: {}
+  echora_logs: {}

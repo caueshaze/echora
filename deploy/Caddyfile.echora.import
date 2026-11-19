@@ -1,0 +1,3 @@
+# Exemplo de linha a acrescentar ao Caddyfile existente APÓS inspecionar o arquivo real:
+import /etc/caddy/echora.caddy
+# O fragmento deve ser montado em /etc/caddy/echora.caddy no contêiner existente.

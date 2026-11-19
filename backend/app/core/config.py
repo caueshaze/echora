@@ -231,8 +231,7 @@ class Settings(BaseSettings):
         ]
         if not origins:
             return []
-        if self.is_production:
-            origins = [origin for origin in origins if origin not in {"*", "/*"}]
+        origins = [origin for origin in origins if "*" not in origin]
         return origins
 
     def normalized_database_url(self) -> str:

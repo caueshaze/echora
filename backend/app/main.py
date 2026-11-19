@@ -4,6 +4,9 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+import redis
 from slowapi.middleware import SlowAPIMiddleware
 
 from .api import api_router
@@ -12,6 +15,7 @@ from .core.config import get_settings
 from .core.error_handlers import register_exception_handlers
 from .core.logging import RequestLoggingMiddleware, setup_logging
 from .core.rate_limit import get_rate_limiter
+from .core.database import _get_sessionmaker
 
 LOGGER = logging.getLogger("echora.app")
 
@@ -31,6 +35,24 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.is_production else "/openapi.json",
     )
     app.state.settings = settings
+    limiter = get_rate_limiter()
+
+    @app.get('/health/ready', include_in_schema=False)
+    @limiter.exempt
+    def readiness():
+        try:
+            with _get_sessionmaker()() as session:
+                session.execute(text('SELECT 1'))
+            if settings.rate_limit_storage_uri:
+                client = redis.Redis.from_url(settings.rate_limit_storage_uri, socket_timeout=2, socket_connect_timeout=2)
+                try:
+                    client.ping()
+                finally:
+                    client.close()
+        except Exception:
+            LOGGER.warning('Verificação de disponibilidade falhou')
+            return JSONResponse(status_code=503, content={'status': 'unavailable'})
+        return {'status': 'ok'}
 
     @app.middleware("http")
     async def security_headers(request, call_next):
@@ -48,11 +70,10 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origin_list(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Echora-CSRF", "Idempotency-Key"],
     )
 
     # --- Rate limiting ---
-    limiter = get_rate_limiter()
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
 
@@ -68,11 +89,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def preload_model() -> None:
         cfg = get_settings()
-        provider = (cfg.llm_provider or "gemma").lower()
+        provider = (cfg.summary_provider or cfg.llm_provider or "openai").lower()
         gemma_enabled = bool(getattr(cfg, "gemma_enabled", False))
 
         try:
-            if gemma_enabled and provider in ("gemma", "auto"):
+            if provider in ("openai", "chatgpt"):
+                LOGGER.info("Resumos configurados para OpenAI; nenhuma chamada feita na inicialização.")
+            elif gemma_enabled and provider in ("gemma", "auto"):
                 if hasattr(llm, "_ensure_gemma"):
                     llm._ensure_gemma()  # type: ignore[attr-defined]
                     LOGGER.info("LLM Gemma pré-carregado com sucesso.")

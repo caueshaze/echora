@@ -13,6 +13,7 @@ from ..schemas.classroom import ClassroomCreate, ClassroomUpdate
 from ..schemas.user import UserPublic
 from .access_control import enforce_same_school, resolve_school_assignment
 from .organization_service import ensure_non_empty, require_school, require_subject
+from .audit_service import record_event
 
 
 def _load_subjects(db: Session, school_id: int, subject_ids: list[int]):
@@ -84,6 +85,9 @@ def create_classroom(
     )
     classroom.subjects = subjects
     db.add(classroom)
+    db.flush()
+    record_event(db, actor=current_user, action='classroom.create', resource_type='classroom',
+                 resource_id=classroom.id, school_id=classroom.school_id)
     db.commit()
     db.refresh(classroom)
     return classroom
@@ -132,6 +136,8 @@ def update_classroom(
     classroom.grade_level = payload.grade_level
     classroom.subjects = subjects
     db.add(classroom)
+    record_event(db, actor=current_user, action='classroom.update', resource_type='classroom',
+                 resource_id=classroom.id, school_id=classroom.school_id)
     db.commit()
     db.refresh(classroom)
     return classroom
@@ -162,5 +168,7 @@ def delete_classroom(
             status_code=status.HTTP_409_CONFLICT,
             detail="Não é possível remover: existem alunos ou atribuições vinculados",
         )
+    record_event(db, actor=current_user, action='classroom.delete', resource_type='classroom',
+                 resource_id=classroom.id, school_id=classroom.school_id)
     db.delete(classroom)
     db.commit()

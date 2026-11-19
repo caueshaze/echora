@@ -11,6 +11,8 @@ from ....models import Subject, TeacherAssignment
 from ....models.organization import classroom_subjects_table
 from ....schemas.subject import SubjectCreate, SubjectPublic, SubjectUpdate
 from ....schemas.user import UserPublic
+from ....services.audit_service import record_event
+from .audit_route import AuditedAdminRoute
 from .deps import (
     enforce_same_school,
     require_admin_user,
@@ -18,7 +20,7 @@ from .deps import (
     resolve_school_assignment,
 )
 
-router = APIRouter(prefix="/subjects")
+router = APIRouter(prefix="/subjects", route_class=AuditedAdminRoute)
 
 
 @router.post(
@@ -72,6 +74,8 @@ def create_subject(
         school_id=school.id,
     )
     db.add(subject)
+    db.flush()
+    record_event(db, actor=current_user, action='subject.create', resource_type='subject', resource_id=subject.id, school_id=subject.school_id)
     db.commit()
     db.refresh(subject)
     return SubjectPublic.model_validate(subject)
@@ -150,6 +154,7 @@ def update_subject(
     subject.color = payload.color
     subject.description = payload.description
     db.add(subject)
+    record_event(db, actor=current_user, action='subject.update', resource_type='subject', resource_id=subject.id, school_id=subject.school_id)
     db.commit()
     db.refresh(subject)
     return SubjectPublic.model_validate(subject)
@@ -188,5 +193,6 @@ def delete_subject(
             status_code=status.HTTP_409_CONFLICT,
             detail="Não é possível remover: há turmas ou atribuições vinculadas",
         )
+    record_event(db, actor=current_user, action='subject.delete', resource_type='subject', resource_id=subject.id, school_id=subject.school_id)
     db.delete(subject)
     db.commit()

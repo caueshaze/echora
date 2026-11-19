@@ -149,7 +149,7 @@ class ECH018023Tests(unittest.TestCase):
         client = unittest.mock.MagicMock()
         client.__enter__.return_value.post.return_value = unittest.mock.MagicMock(
             status_code=200,
-            json=lambda: {'choices': [{'message': {'content': 'Resumo válido para o teste.'}}]},
+            json=lambda: {'choices': [{'finish_reason': 'stop', 'message': {'content': 'Resumo válido para o teste.'}}]},
         )
         with patch.object(llm, 'get_settings', return_value=settings), \
              patch.object(llm.httpx, 'Client', return_value=client) as client_factory, \

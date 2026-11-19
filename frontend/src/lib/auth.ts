@@ -12,6 +12,7 @@ export type BackendUser = {
   classroom_id?: number | null
   subject_id?: number | null
   teachable_subject_ids?: number[]
+  must_change_password?: boolean
 }
 
 type TokenResponse = {
@@ -66,6 +67,7 @@ async function performRefresh(): Promise<string | null> {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Echora-CSRF': '1' },
     })
     if (!response.ok) {
       return null
@@ -90,7 +92,7 @@ function refreshToken(): Promise<string | null> {
 
 export async function logoutSession(): Promise<void> {
   if (ongoingRefresh) await ongoingRefresh
-  const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' })
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: 'POST', credentials: 'include', headers: { 'X-Echora-CSRF': '1' } })
   if (!response.ok) throw new Error('Não foi possível encerrar a sessão no servidor.')
 }
 

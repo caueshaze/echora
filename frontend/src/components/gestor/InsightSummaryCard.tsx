@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react'
 import type { FeedbackSummary } from '../../lib/types'
+import { ExecutiveReport } from './ExecutiveReport'
 
 type InsightSummaryCardProps = {
   summary: FeedbackSummary | null
@@ -20,13 +21,13 @@ export function InsightSummaryCard({
         <div className="space-y-0.5">
           <div className="inline-flex items-center gap-1.5 text-brand-700 text-xs font-semibold">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Relatório Executivo</span>
+            <span>Maya</span>
           </div>
           <h3 className="text-base sm:text-lg font-semibold text-slate-900">
-            Síntese institucional com IA
+            Análise da Maya
           </h3>
           <p className="text-sm text-slate-500">
-            Consolida o clima escolar da unidade com base nos relatos mais recentes.
+            Diagnóstico do clima escolar e recomendações para a gestão, com base nos relatos selecionados.
           </p>
         </div>
         <button
@@ -36,67 +37,31 @@ export function InsightSummaryCard({
           disabled={summaryLoading}
         >
           <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-          {summaryLoading ? 'Gerando síntese...' : 'Gerar relatório'}
+          {summaryLoading ? 'Gerando análise...' : 'Gerar análise'}
         </button>
       </div>
 
       {summaryStatus && (
-        <div className="rounded-lg bg-rose-50 border border-rose-200/80 px-3.5 py-2.5 text-sm text-rose-700">
+        <div role="alert" className="rounded-lg bg-rose-50 border border-rose-200/80 px-3.5 py-2.5 text-sm text-rose-700">
           {summaryStatus}
         </div>
       )}
 
+      {summaryLoading && <p role="status" className="text-sm text-slate-600">A Maya está analisando os relatos selecionados.</p>}
+
       {summary && (
         <div className="space-y-4 pt-2 border-t border-slate-100">
-          <div className="rounded-xl bg-brand-50/50 border border-brand-100 p-4 text-sm leading-relaxed text-slate-800 whitespace-pre-line">
-            {summary.summary_text}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {summary.positives.length > 0 && (
-              <InsightList title="Destaques positivos" items={summary.positives} tone="positive" />
-            )}
-            {summary.opportunities.length > 0 && (
-              <InsightList
-                title="Pontos de atenção pedagógica"
-                items={summary.opportunities}
-                tone="attention"
-              />
-            )}
-          </div>
+          {summary.summary_text?.trim() ? <ExecutiveReport text={summary.summary_text} /> : (
+            <p className="text-sm text-slate-600">Nenhuma análise foi disponibilizada. Tente gerar novamente.</p>
+          )}
         </div>
       )}
 
       {!summary && !summaryLoading && !summaryStatus && (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-6 text-center text-sm text-slate-500">
-          Acione <strong className="text-slate-700">Gerar relatório</strong> para obter uma leitura sintetizada dos feedbacks da escola.
+          Acione <strong className="text-slate-700">Gerar análise</strong> para obter uma leitura dos relatos da escola.
         </div>
       )}
-    </div>
-  )
-}
-
-function InsightList({
-  title,
-  items,
-  tone,
-}: {
-  title: string
-  items: string[]
-  tone: 'positive' | 'attention'
-}) {
-  const dotColor = tone === 'positive' ? 'bg-emerald-500' : 'bg-amber-500'
-  return (
-    <div className="rounded-lg border border-slate-200/80 p-4 space-y-2 bg-white">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</p>
-      <ul className="space-y-2 text-sm text-slate-700">
-        {items.map((item, index) => (
-          <li key={`${title}-${index}`} className="flex items-start gap-2">
-            <span className={`h-1.5 w-1.5 rounded-full ${dotColor} mt-2 shrink-0`} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

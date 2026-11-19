@@ -288,7 +288,7 @@ export function AppShell<T extends string>({
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
         <main
           className={`flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 lg:py-8 space-y-6 ${
-            hasBottomNav ? 'pb-24 lg:pb-10' : 'pb-10'
+            hasBottomNav ? 'pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-10' : 'pb-10'
           }`}
         >
           {/* Page Header */}

@@ -36,6 +36,10 @@ async function authFetch<T>(path: string, options: RequestInit = {}, retryOn401 
   }
 
   const headers = new Headers(options.headers || {})
+  const method = (options.method || 'GET').toUpperCase()
+  if ((path.startsWith('/api/v1/admin/') || path.startsWith('/api/v1/feedback/admin/') || path.includes('/report') || path.includes('/triggers/')) && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !headers.has('Idempotency-Key')) {
+    headers.set('Idempotency-Key', crypto.randomUUID())
+  }
   if (!headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${initialToken}`)
   }

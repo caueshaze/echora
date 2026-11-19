@@ -10,8 +10,9 @@ from ....schemas.assignment import ClassroomAssignments
 from ....schemas.user import UserPublic
 from ....services import assignment_service
 from .deps import require_admin_user
+from .audit_route import AuditedAdminRoute
 
-router = APIRouter(prefix="/assignments")
+router = APIRouter(prefix="/assignments", route_class=AuditedAdminRoute)
 
 
 @router.get(

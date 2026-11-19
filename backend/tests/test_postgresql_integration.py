@@ -53,7 +53,7 @@ class PostgreSQLIntegrationTests(unittest.TestCase):
         app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, app_env='test', secret_key='test-secret')
         app.dependency_overrides[get_current_user] = lambda: UserPublic.model_validate(self.manager)
         app.dependency_overrides[get_session] = lambda: self.db
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers={'Origin': 'http://localhost:5173', 'X-Echora-CSRF': '1'})
         self.decrypt = patch('backend.app.api.v1.feedback_utils.decrypt_feedback', return_value='test')
         self.decrypt.start()
         self.keyword = 'test-' + suffix
@@ -61,15 +61,19 @@ class PostgreSQLIntegrationTests(unittest.TestCase):
     def tearDown(self):
         self.decrypt.stop()
         self.db.rollback()
-        self.db.execute(text('DELETE FROM trigger_keywords WHERE school_id = :id'), {'id': self.school})
-        self.db.execute(text('DELETE FROM feedbacks WHERE sender_id = :id'), {'id': self.manager.id})
-        self.db.execute(text('DELETE FROM auth_sessions WHERE user_id = :id'), {'id': self.manager.id})
-        self.db.execute(text('DELETE FROM users WHERE school_id = :id'), {'id': self.school})
-        self.db.execute(text('DELETE FROM subjects WHERE school_id = :id'), {'id': self.school})
-        self.db.execute(text('DELETE FROM classrooms WHERE school_id = :id'), {'id': self.school})
-        self.db.execute(text('DELETE FROM schools WHERE id = :id'), {'id': self.school})
-        self.db.commit()
+        fixture_url = os.environ.get('ECHORA_TEST_ADMIN_POSTGRES_URL')
+        fixture_engine = create_engine(fixture_url) if fixture_url else self.engine
+        with fixture_engine.begin() as connection:
+            connection.execute(text('DELETE FROM trigger_keywords WHERE school_id = :id'), {'id': self.school})
+            connection.execute(text('DELETE FROM feedbacks WHERE sender_id = :id'), {'id': self.manager.id})
+            connection.execute(text('DELETE FROM auth_sessions WHERE user_id = :id'), {'id': self.manager.id})
+            connection.execute(text('DELETE FROM users WHERE school_id = :id'), {'id': self.school})
+            connection.execute(text('DELETE FROM subjects WHERE school_id = :id'), {'id': self.school})
+            connection.execute(text('DELETE FROM classrooms WHERE school_id = :id'), {'id': self.school})
+            connection.execute(text('DELETE FROM schools WHERE id = :id'), {'id': self.school})
         self.db.close()
+        if fixture_engine is not self.engine:
+            fixture_engine.dispose()
         self.engine.dispose()
 
     def test_trigger_and_mixed_feedback_targets(self):
@@ -115,3 +119,17 @@ class PostgreSQLIntegrationTests(unittest.TestCase):
             factory = database._get_sessionmaker()
             with factory() as session:
                 self.assertEqual(session.execute(text('SELECT 1')).scalar_one(), 1)
+
+    def test_runtime_cannot_change_or_delete_audit_events(self):
+        for statement in ('UPDATE audit_events SET result = result', 'DELETE FROM audit_events'):
+            with self.engine.connect() as connection:
+                with self.assertRaises(ProgrammingError):
+                    connection.execute(text(statement))
+
+    def test_feedback_admin_delete_requires_idempotency_key(self):
+        feedback = self.db.query(Feedback).filter_by(sender_id=self.manager.id).first()
+        path = f'/api/v1/feedback/admin/{feedback.id}'
+        self.assertEqual(self.client.delete(path).status_code, 400)
+        headers = {'Idempotency-Key': str(uuid4())}
+        self.assertEqual(self.client.delete(path, headers=headers).status_code, 204)
+        self.assertEqual(self.client.delete(path, headers=headers).status_code, 409)

@@ -9,7 +9,7 @@ class SubjectBase(BaseModel):
         default=None, max_length=64, description="Código opcional para integrações"
     )
     school_id: int = Field(..., description="ID da unidade escolar")
-    color: str | None = Field(default=None, max_length=16)
+    color: str | None = Field(default=None, pattern=r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
     description: str | None = Field(default=None, max_length=255)
 
 

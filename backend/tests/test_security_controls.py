@@ -17,6 +17,8 @@ from backend.app.core.logging import SecureTimedRotatingFileHandler
 from backend.app.main import create_app
 from backend.app.schemas.feedback import FeedbackCreate
 from backend.app.schemas.predict import PredictBatchRequest, PredictItem
+from backend.app.schemas.subject import SubjectCreate
+from backend.app.schemas.school import SchoolCreate
 from backend.app.schemas.user import UserCreate, UserPublic, UserUpdate
 
 
@@ -24,13 +26,14 @@ class SecurityControlsTests(unittest.TestCase):
     def test_model_request_has_output_limit_and_no_temperature(self):
         settings = Settings(_env_file=None, openai_api_key='test-key', summary_model='gpt-5-nano')
         response = MagicMock(status_code=200)
-        response.json.return_value = {'choices': [{'message': {'content': 'Uma resposta de teste suficientemente clara.'}}]}
+        response.json.return_value = {'choices': [{'finish_reason': 'stop', 'message': {'content': 'Uma resposta de teste suficientemente clara.'}}]}
         client = MagicMock()
         client.__enter__.return_value.post.return_value = response
         with patch.object(llm, 'get_settings', return_value=settings), patch.object(llm.httpx, 'Client', return_value=client), patch.object(llm, '_post_process_summary', side_effect=lambda x: x):
-            llm._run_openai('texto já filtrado', max_new_tokens=123)
+            llm._run_openai('texto já filtrado')
         payload = client.__enter__.return_value.post.call_args.kwargs['json']
-        self.assertEqual(payload['max_completion_tokens'], 123)
+        self.assertEqual(payload['max_completion_tokens'], 512)
+        self.assertEqual(payload['reasoning_effort'], 'minimal')
         self.assertFalse(payload['store'])
         self.assertNotIn('temperature', payload)
 
@@ -65,6 +68,16 @@ class SecurityControlsTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             UserCreate(email='a@example.org', full_name='A', role='aluno', password='1234567890')
         self.assertEqual(UserUpdate(password='  long password  ').password, '  long password  ')
+
+    def test_school_email_and_subject_color_validation(self):
+        for color in ('red', '#abcd', '#xyzxyz'):
+            with self.subTest(color=color), self.assertRaises(ValidationError):
+                SubjectCreate(name='Matemática', school_id=1, color=color)
+        for color in ('#123', '#aBc123'):
+            self.assertEqual(SubjectCreate(name='Matemática', school_id=1, color=color).color, color)
+        with self.assertRaises(ValidationError):
+            SchoolCreate(name='Escola', contact_email='invalido')
+        self.assertEqual(SchoolCreate(name='Escola', contact_email='contato@example.org').contact_email, 'contato@example.org')
 
     def test_sql_logging_disabled_and_api_headers(self):
         settings = Settings(_env_file=None, app_env='test', debug=True)

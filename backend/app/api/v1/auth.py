@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -12,9 +12,10 @@ from sqlalchemy.orm import Session
 from ...core.config import Settings, get_settings
 from ...core.database import get_session
 from ...core.rate_limit import get_rate_limiter, login_rate_limit
-from ...core.security import create_access_token, get_current_user, verify_password
+from ...core.security import create_access_token, get_current_user, verify_password, hash_password
 from ...models import AuthSession, User
-from ...schemas.auth import LoginRequest, TokenResponse
+from ...schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse
+from ...services.audit_service import record_event
 from ...schemas.user import UserPublic
 
 router = APIRouter(prefix='/auth', tags=['auth'])
@@ -29,8 +30,10 @@ def _hash_token(value: str) -> str:
 
 def _check_origin(request: Request, settings: Settings) -> None:
     origin = request.headers.get('origin')
-    if origin and origin not in settings.cors_origin_list():
+    if not origin or origin == 'null' or origin not in settings.cors_origin_list():
         raise HTTPException(status_code=403, detail='Origem não autorizada')
+    if request.headers.get('x-echora-csrf') != '1':
+        raise HTTPException(status_code=403, detail='Cabeçalho de proteção CSRF ausente')
 
 
 def _response(user: User, session: AuthSession, refresh: str, settings: Settings) -> JSONResponse:
@@ -64,6 +67,25 @@ async def login(request: Request, payload: LoginRequest, settings: Settings = De
 @router.get('/me', response_model=UserPublic, summary='Retorna o usuário autenticado')
 def read_current_user(current_user: UserPublic = Depends(get_current_user)) -> UserPublic:
     return current_user
+
+
+@router.post('/change-password', status_code=204)
+@limiter.limit(login_rate_limit())
+def change_password(request: Request, payload: ChangePasswordRequest,
+                    current_user: UserPublic = Depends(get_current_user), db: Session = Depends(get_session)):
+    user = db.execute(select(User).where(User.id == current_user.id).with_for_update()).scalar_one()
+    if not user.must_change_password or not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=403, detail='Não foi possível alterar a senha')
+    if verify_password(payload.new_password, user.hashed_password) or payload.new_password.casefold() == user.email.casefold():
+        raise HTTPException(status_code=422, detail='Escolha uma nova senha diferente')
+    user.hashed_password = hash_password(payload.new_password)
+    user.must_change_password = False
+    db.execute(update(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+               .values(revoked_at=datetime.now(timezone.utc)))
+    record_event(db, actor=current_user, action='bootstrap.password_change', resource_type='user',
+                 resource_id=user.id, school_id=None)
+    db.commit()
+    return Response(status_code=204)
 
 
 def _cookie_parts(request: Request) -> tuple[str, str]:

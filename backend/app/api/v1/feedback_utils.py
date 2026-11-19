@@ -70,9 +70,8 @@ def _serialize_feedback(
     )
 
     is_anonymous = bool(getattr(feedback, "is_anonymous", False))
-    is_admin_viewer = viewer is not None and viewer.role == "admin"
     is_sender_viewer = viewer is not None and str(viewer.id) == str(feedback.sender_id)
-    mask_sender_identity = is_anonymous and not is_admin_viewer and not is_sender_viewer
+    mask_sender_identity = is_anonymous and not is_sender_viewer
 
     out_sender_id = "anonymous" if mask_sender_identity else feedback.sender_id
     out_sender_name = "Estudante (Anônimo)" if mask_sender_identity else resolved_sender
@@ -90,7 +89,7 @@ def _serialize_feedback(
         sender_name=out_sender_name,
         sender_role=out_sender_role,
         sender_email=out_sender_email,
-        sender_school_id=resolved_sender_school,
+        sender_school_id=None if mask_sender_identity else resolved_sender_school,
         target_type=feedback.target_type,
         target_id=feedback.target_id,
         target_name=resolved_target,

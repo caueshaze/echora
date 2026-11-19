@@ -88,6 +88,7 @@ class UserRecipient(BaseModel):
 
 class UserPublic(UserBase):
     id: str
+    must_change_password: bool = False
     school_id: Optional[int] = None
     classroom_id: Optional[int] = None
     teachable_subject_ids: list[int] = Field(

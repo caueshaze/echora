@@ -47,6 +47,9 @@ from .feedback_utils import (
     _visible_subject_ids,
 )
 
+from .admin.idempotency import administrative_idempotency
+from ...services.audit_service import record_event
+
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 limiter = get_rate_limiter()
 
@@ -355,14 +358,16 @@ def list_all_feedbacks(
 
 @router.delete(
     "/admin/all",
+    dependencies=[Depends(administrative_idempotency)],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove todos os feedbacks (apenas admin)",
 )
 def delete_all_feedbacks(
-    _: UserPublic = Depends(require_role("admin")),
+    current_user: UserPublic = Depends(require_role("admin")),
     db: Session = Depends(get_session),
 ) -> None:
     db.execute(delete(Feedback))
+    record_event(db, actor=current_user, action='feedback.delete_all', resource_type='feedback', resource_id=None, school_id=None)
     db.commit()
 
 
@@ -458,6 +463,7 @@ def list_triggered_feedbacks(
 
 @router.post(
     "/{feedback_id}/report",
+    dependencies=[Depends(administrative_idempotency)],
     response_model=FeedbackPublic,
     summary="Reporta manualmente um feedback como alerta",
 )
@@ -526,6 +532,8 @@ def report_feedback_alert(
     feedback.trigger_resolved_by = None
     feedback.trigger_resolved_note = None
     db.add(feedback)
+    record_event(db, actor=current_user, action='feedback.report', resource_type='feedback', resource_id=feedback.id,
+                 school_id=_get_feedback_target_school_id(db, feedback))
     db.commit()
     db.refresh(feedback)
     return _serialize_feedback(feedback, viewer=current_user)
@@ -533,6 +541,7 @@ def report_feedback_alert(
 
 @router.post(
     "/triggers/{feedback_id}/resolve",
+    dependencies=[Depends(administrative_idempotency)],
     response_model=FeedbackPublic,
     summary="Marca um alerta de gatilho como resolvido",
 )
@@ -580,6 +589,8 @@ def resolve_trigger_alert(
         payload.note.strip() if payload.note and payload.note.strip() else None
     )
     db.add(feedback)
+    record_event(db, actor=current_user, action='feedback.resolve', resource_type='feedback', resource_id=feedback.id,
+                 school_id=_get_feedback_target_school_id(db, feedback))
     db.commit()
     db.refresh(feedback)
     return _serialize_feedback(feedback, viewer=current_user)
@@ -588,6 +599,7 @@ def resolve_trigger_alert(
 
 @router.delete(
     "/admin/{feedback_id}",
+    dependencies=[Depends(administrative_idempotency)],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove um feedback específico (admin/gestor)",
 )
@@ -620,6 +632,8 @@ def delete_feedback(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Gestores só podem remover feedbacks da própria unidade",
             )
+    record_event(db, actor=current_user, action='feedback.delete', resource_type='feedback', resource_id=feedback.id,
+                 school_id=_get_feedback_target_school_id(db, feedback))
     db.delete(feedback)
     db.commit()
 

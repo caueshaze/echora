@@ -1,0 +1,20 @@
+FROM python:3.13.5-slim-bookworm@sha256:a7cb177dc60dfa77b223192cd0d9e6ce1aac7cf9a569023d68e7c91b6371a718 AS build
+ENV VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN python -m venv "$VIRTUAL_ENV"
+WORKDIR /build
+COPY deploy/requirements.lock ./
+RUN pip install --no-cache-dir --no-deps --index-url https://download.pytorch.org/whl/cpu 'torch==2.9.1+cpu'
+RUN pip install --no-cache-dir --no-deps -r requirements.lock && pip check
+
+FROM python:3.13.5-slim-bookworm@sha256:a7cb177dc60dfa77b223192cd0d9e6ce1aac7cf9a569023d68e7c91b6371a718 AS runtime
+ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 APP_ENV=production DEBUG=false
+RUN groupadd --system --gid 10001 echora && useradd --system --uid 10001 --gid echora --home-dir /app echora && mkdir -p /app/logs && chown -R echora:echora /app
+WORKDIR /app
+COPY --from=build /opt/venv /opt/venv
+COPY --chown=10001:10001 backend/app /app/backend/app
+COPY --chown=10001:10001 migrations /app/migrations
+COPY --chown=10001:10001 scripts /app/scripts
+COPY --chown=10001:10001 alembic.ini /app/alembic.ini
+USER 10001:10001
+EXPOSE 8000
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "172.30.87.2"]

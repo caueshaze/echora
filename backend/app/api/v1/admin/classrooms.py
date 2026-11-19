@@ -12,8 +12,9 @@ from ....schemas.classroom import ClassroomCreate, ClassroomPublic, ClassroomUpd
 from ....schemas.user import UserPublic
 from ....services import classroom_service
 from .deps import require_admin_user
+from .audit_route import AuditedAdminRoute
 
-router = APIRouter(prefix="/classrooms")
+router = APIRouter(prefix="/classrooms", route_class=AuditedAdminRoute)
 
 
 @router.post(
