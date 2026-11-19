@@ -68,7 +68,10 @@ cleanup() {
   if [ "$created_instance" = 1 ]; then
     purpose=$(docker_cmd inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
     label=$(docker_cmd inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
-    [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ] && docker_cmd rm -f "$INSTANCE" >/dev/null 2>&1 || true
+    if [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ]; then
+      docker_cmd exec --user 0 "$INSTANCE" sh -c 'rm -f /restore-tmp/backup.dump' >/dev/null 2>&1 || true
+      docker_cmd rm -f "$INSTANCE" >/dev/null 2>&1 || true
+    fi
   fi
   if [ "$created_network" = 1 ]; then
     purpose=$(docker_cmd network inspect "$NETWORK" --format '{{index .Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
@@ -83,9 +86,16 @@ cleanup() {
 trap cleanup EXIT
 
 umask 077
+BACKUP_SIZE=$(stat -c '%s' "$BACKUP")
+BACKUP_SHA256=$(sha256sum "$BACKUP" | awk '{print $1}')
+if [ "$BACKUP_SIZE" -le 0 ] || [ -z "$BACKUP_SHA256" ]; then
+  record FAIL backup "arquivo vazio ou checksum indisponível"
+  exit 1
+fi
 {
   echo "backup=$(basename "$BACKUP")"
-  sha256sum "$BACKUP"
+  echo "backup_size=$BACKUP_SIZE"
+  echo "backup_sha256=$BACKUP_SHA256"
   docker_cmd image inspect "$POSTGRES_IMAGE" --format 'postgres_image={{.Id}} {{index .RepoDigests 0}}'
   docker_cmd run --rm --network none "$POSTGRES_IMAGE" pg_restore --version
   docker_cmd run --rm --network none "$POSTGRES_IMAGE" postgres --version
@@ -144,9 +154,24 @@ test "$actual" = "$DB|echora_restore_admin" || {
 echo "identity=$actual" | tee -a "$REPORT"
 
 # PostgreSQL 16.16 supports these options; -X is intentionally not passed.
-# The custom dump format requires a seekable input file. Copy it only into
-# the disposable container's tmpfs; it is removed before container cleanup.
-docker_cmd cp "$BACKUP" "$INSTANCE:/restore-tmp/backup.dump"
+# Stream the custom dump into the disposable container's tmpfs. This avoids
+# the Docker file-copy API, which is unreliable for this tmpfs destination on the VPS.
+if ! cat "$BACKUP" | docker_cmd exec -i --user 0 "$INSTANCE" \
+  sh -c 'cat > /restore-tmp/backup.dump'; then
+  record FAIL backup_transfer "stream para o tmpfs falhou"
+  exit 1
+fi
+REMOTE_META=$(docker_cmd exec --user 0 "$INSTANCE" sh -c \
+  'test -s /restore-tmp/backup.dump && stat -c "%s" /restore-tmp/backup.dump && sha256sum /restore-tmp/backup.dump' \
+  2>/dev/null || true)
+REMOTE_SIZE=$(printf '%s\n' "$REMOTE_META" | sed -n '1p')
+REMOTE_SHA256=$(printf '%s\n' "$REMOTE_META" | sed -n '2p' | awk '{print $1}')
+if [ "$REMOTE_SIZE" != "$BACKUP_SIZE" ] || [ "$REMOTE_SHA256" != "$BACKUP_SHA256" ]; then
+  record FAIL backup_transfer "tamanho ou SHA-256 no container não corresponde ao host"
+  exit 1
+fi
+record PASS backup_transfer "tamanho e SHA-256 confirmados dentro do tmpfs"
+
 if ! docker_cmd exec --user 0 "$INSTANCE" pg_restore \
   --exit-on-error \
   --no-owner \
@@ -158,8 +183,12 @@ if ! docker_cmd exec --user 0 "$INSTANCE" pg_restore \
   record FAIL pg_restore "restauração falhou"
   exit 1
 fi
-docker_cmd exec --user 0 "$INSTANCE" rm -f /restore-tmp/backup.dump
+if ! docker_cmd exec --user 0 "$INSTANCE" sh -c 'rm -f /restore-tmp/backup.dump && test ! -e /restore-tmp/backup.dump'; then
+  record FAIL backup_cleanup "backup temporário não foi removido"
+  exit 1
+fi
 record PASS pg_restore "restauração concluída sem erro"
+record PASS backup_cleanup "backup removido do tmpfs"
 
 if ! docker_cmd exec "$INSTANCE" psql -X -v ON_ERROR_STOP=1 \
   -v expected_revision="$EXPECTED_ALEMBIC_REVISION" \
@@ -275,7 +304,7 @@ read -r -s -p 'DATA_ENCRYPTION_KEY (cofre): ' KEY_V1; echo >&2
 read -r -s -p 'DATA_ENCRYPTION_KEYS JSON (cofre): ' KEY_RING; echo >&2
 read -r -s -p 'DATA_ENCRYPTION_ACTIVE_KEY (cofre): ' KEY_ACTIVE; echo >&2
 
-# Rootless/SELinux hosts may deny a bind mount of the workspace. Copy only
+# Rootless/SELinux hosts may deny a bind mount of the workspace. Stream only
 # source code (never .env or keys) into the validator's disposable filesystem.
 docker_cmd run -d --rm \
   --name "$VALIDATOR" \
@@ -297,9 +326,16 @@ do
   test -f "$ROOT/$module" || { record FAIL validator_source "módulo ausente: $module"; exit 1; }
   destination="/restore-src/$module"
   docker_cmd exec --user 0 "$VALIDATOR" mkdir -p "$(dirname "$destination")"
-  docker_cmd cp "$ROOT/$module" "$VALIDATOR:$destination" >/dev/null
+  if ! cat "$ROOT/$module" | docker_cmd exec -i --user 0 "$VALIDATOR" sh -c "cat > '$destination'"; then
+    record FAIL validator_source "transferência do módulo falhou: $module"
+    exit 1
+  fi
 done
-docker_cmd cp "$ROOT/scripts/validate_restore_crypto.py" "$VALIDATOR:/restore-src/" >/dev/null
+if ! cat "$ROOT/scripts/validate_restore_crypto.py" | docker_cmd exec -i --user 0 "$VALIDATOR" \
+  sh -c "cat > '/restore-src/validate_restore_crypto.py'"; then
+  record FAIL validator_source "transferência do validador falhou"
+  exit 1
+fi
 
 set +e
 printf '%s\n%s\n%s\n' "$KEY_V1" "$KEY_RING" "$KEY_ACTIVE" \
