@@ -215,8 +215,6 @@ def measure_llm_latency(prompt_text: str = "Gere um breve resumo positivo.", max
 # ==========================================================
 # Execução do Modelo de Linguagem (OpenAI / Gemma)
 # ==========================================================
-# Separate from Gemma's max_new_tokens: OpenAI counts visible and reasoning tokens.
-_OPENAI_OUTPUT_BUDGETS = (512, 1024)
 _OPENAI_GPT5_NANO_MODELS = {'gpt-5-nano', 'gpt-5-nano-2025-08-07'}
 
 
@@ -248,9 +246,12 @@ def _run_openai(prompt_text: str, *, institutional: bool = False) -> str:
     if urlsplit(base_url).hostname == 'api.openai.com' and model in _OPENAI_GPT5_NANO_MODELS:
         payload['reasoning_effort'] = 'minimal'
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    # OpenAI budgets include reasoning and visible output, unlike Gemma's limit.
+    budgets = (settings.summary_openai_max_completion_tokens,
+               settings.summary_openai_retry_max_completion_tokens)
 
     with httpx.Client(timeout=45.0, follow_redirects=False) as client:
-        for attempt, budget in enumerate(_OPENAI_OUTPUT_BUDGETS, 1):
+        for attempt, budget in enumerate(budgets, 1):
             payload['max_completion_tokens'] = budget
             started = perf_counter()
             try:
@@ -302,7 +303,7 @@ def _run_openai(prompt_text: str, *, institutional: bool = False) -> str:
             result = _post_process_summary(content or '')
             if reason == 'stop' and _complete_summary(result):
                 return result
-            if attempt == len(_OPENAI_OUTPUT_BUDGETS):
+            if attempt == len(budgets):
                 raise RuntimeError('Serviço não gerou um resumo completo')
             LOGGER.warning('openai attempt=%d retry=%s', attempt,
                            'length' if reason == 'length' else 'empty' if not result else 'incomplete')

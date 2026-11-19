@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     summary_model: str = Field(
         default="gpt-5-nano",
     )
+    # Limits include both reasoning and visible output tokens.
+    summary_openai_max_completion_tokens: int = Field(default=512, ge=1)
+    summary_openai_retry_max_completion_tokens: int = Field(default=1024, ge=1)
     openai_api_key: str = Field(
         default="",
     )

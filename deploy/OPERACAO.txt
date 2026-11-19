@@ -28,6 +28,13 @@ Sem ONNX usa heurística; instale modelos confiáveis com proprietário e
 permissões que impeçam escrita por usuários da aplicação. Gemma exige memória
 e modelo local; confira dependências e tamanho antes de ativá-lo.
 
+Para ajustar o limite de geração OpenAI, configure em .env.prod
+SUMMARY_OPENAI_MAX_COMPLETION_TOKENS e SUMMARY_OPENAI_RETRY_MAX_COMPLETION_TOKENS
+(padrões 512 e 1024). São limites independentes por tentativa e incluem tokens
+de raciocínio e resposta; aumentá-los pode elevar o custo. A aplicação lê esses
+valores na inicialização: após alterar .env.prod, recrie o contêiner backend.
+deploy/compose.env configura a interpolação do Compose, não o ambiente da API.
+
 Comandos posteriores na VPS, após verificar colisões e IPs:
   docker network create --internal --subnet 172.30.86.0/24 echora_proxy
   docker network connect --ip 172.30.86.2 echora_proxy <NOME_CADDY_EXISTENTE>

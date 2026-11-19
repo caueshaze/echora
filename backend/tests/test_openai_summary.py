@@ -1,9 +1,11 @@
 """OpenAI completion handling; no network or paid requests."""
 import copy
 import logging
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 import httpx
+from pydantic import ValidationError
 from fastapi.testclient import TestClient
 from backend.app.core import llm
 from backend.app.core.config import Settings
@@ -59,6 +61,23 @@ class OpenAISummaryTests(unittest.TestCase):
                 value, calls = self.call([first, completion('Resumo recuperado.')])
                 self.assertEqual(value, 'Resumo recuperado.')
                 self.assertEqual([item['max_completion_tokens'] for item in calls], [512, 1024])
+
+    def test_environment_budgets_control_both_attempts(self):
+        with patch.dict(os.environ, {
+            'SUMMARY_OPENAI_MAX_COMPLETION_TOKENS': '2048',
+            'SUMMARY_OPENAI_RETRY_MAX_COMPLETION_TOKENS': '4096',
+        }):
+            settings = Settings(_env_file=None, app_env='test', openai_api_key='test-secret-key')
+        with patch.object(llm, 'get_settings', return_value=settings):
+            _, calls = self.call([completion('', 'length'), completion('Resumo completo.')])
+        self.assertEqual([item['max_completion_tokens'] for item in calls], [2048, 4096])
+        self.assertEqual([item['reasoning_effort'] for item in calls], ['minimal', 'minimal'])
+
+    def test_environment_budgets_require_positive_integers(self):
+        for key in ('SUMMARY_OPENAI_MAX_COMPLETION_TOKENS', 'SUMMARY_OPENAI_RETRY_MAX_COMPLETION_TOKENS'):
+            for value in ('0', '-1', 'invalido'):
+                with self.subTest(key=key, value=value), patch.dict(os.environ, {key: value}), self.assertRaises(ValidationError):
+                    Settings(_env_file=None, app_env='test')
 
     def test_empty_or_truncated_twice_fails(self):
         for first in (completion(''), completion(None), completion('parcial', 'length')):
