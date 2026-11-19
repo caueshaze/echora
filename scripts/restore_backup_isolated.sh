@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Manual operator procedure: only disposable Podman resources on an internal network.
+# Manual operator procedure: only disposable Docker resources on an internal network.
 : "${ECHORA_RESTORE_APPROVE:?Set ECHORA_RESTORE_APPROVE=YES after reviewing this procedure}"
 test "$ECHORA_RESTORE_APPROVE" = YES
 START_EPOCH=$(date +%s)
+ENGINE=${CONTAINER_ENGINE:-docker}
+command -v "$ENGINE" >/dev/null || { echo "container engine ausente: $ENGINE" >&2; exit 2; }
+docker_cmd() { "$ENGINE" "$@"; }
 
 ROOT=${ECHORA_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}
 BACKUP=${1:-/srv/echora/backups/echora-pre-v2-20261119-215505.dump}
-POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.16-alpine3.24}
-VALIDATOR_IMAGE=${VALIDATOR_IMAGE:-localhost/echora-backend-check:latest}
+POSTGRES_IMAGE=${POSTGRES_IMAGE:-docker.io/library/postgres:16.16-alpine3.24@sha256:9d9e487c1bd6413c52ccb3c02f46c8e37fa1e1d1a32a84519eb4e68d0ad1da30}
+VALIDATOR_IMAGE=${VALIDATOR_IMAGE:-echora-restore-validator:local}
 EXPECTED_ALEMBIC_REVISION=${ECHORA_EXPECTED_ALEMBIC_REVISION:-a7d41e6b2c90}
+
+if ! printf '%s\n' "$POSTGRES_IMAGE" | grep -Eq '@sha256:[0-9a-fA-F]{64}$'; then
+  echo 'POSTGRES_IMAGE deve ser uma referência completa com digest sha256' >&2
+  exit 2
+fi
 
 case "$EXPECTED_ALEMBIC_REVISION" in
   [a-f0-9]*) ;;
@@ -53,20 +61,20 @@ cleanup() {
   set +e
   unset KEY_V1 KEY_RING KEY_ACTIVE
   if [ "$created_validator" = 1 ]; then
-    purpose=$(podman inspect "$VALIDATOR" --format '{{index .Config.Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
-    label=$(podman inspect "$VALIDATOR" --format '{{index .Config.Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
-    [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ] && podman rm -f "$VALIDATOR" >/dev/null 2>&1 || true
+    purpose=$(docker_cmd inspect "$VALIDATOR" --format '{{index .Config.Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
+    label=$(docker_cmd inspect "$VALIDATOR" --format '{{index .Config.Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
+    [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ] && docker_cmd rm -f "$VALIDATOR" >/dev/null 2>&1 || true
   fi
   if [ "$created_instance" = 1 ]; then
-    purpose=$(podman inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
-    label=$(podman inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
-    [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ] && podman rm -f "$INSTANCE" >/dev/null 2>&1 || true
+    purpose=$(docker_cmd inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
+    label=$(docker_cmd inspect "$INSTANCE" --format '{{index .Config.Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
+    [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ] && docker_cmd rm -f "$INSTANCE" >/dev/null 2>&1 || true
   fi
   if [ "$created_network" = 1 ]; then
-    purpose=$(podman network inspect "$NETWORK" --format '{{index .Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
-    label=$(podman network inspect "$NETWORK" --format '{{index .Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
+    purpose=$(docker_cmd network inspect "$NETWORK" --format '{{index .Labels "io.echora.restore-purpose"}}' 2>/dev/null || true)
+    label=$(docker_cmd network inspect "$NETWORK" --format '{{index .Labels "io.echora.restore-instance"}}' 2>/dev/null || true)
     if [ "$purpose" = disposable ] && [ "$label" = "$INSTANCE" ]; then
-      podman network rm "$NETWORK" >/dev/null 2>&1 || true
+      docker_cmd network rm "$NETWORK" >/dev/null 2>&1 || true
     else
       echo 'FAIL network cleanup: ownership labels did not match; network preserved' >&2
     fi
@@ -78,29 +86,34 @@ umask 077
 {
   echo "backup=$(basename "$BACKUP")"
   sha256sum "$BACKUP"
-  podman image inspect "$POSTGRES_IMAGE" --format 'postgres_image={{.Id}} {{index .RepoDigests 0}}'
-  podman run --rm --network none "$POSTGRES_IMAGE" pg_restore --version
-  podman run --rm --network none "$POSTGRES_IMAGE" postgres --version
+  docker_cmd image inspect "$POSTGRES_IMAGE" --format 'postgres_image={{.Id}} {{index .RepoDigests 0}}'
+  docker_cmd run --rm --network none "$POSTGRES_IMAGE" pg_restore --version
+  docker_cmd run --rm --network none "$POSTGRES_IMAGE" postgres --version
 } | tee "$REPORT"
 record PASS tools "PostgreSQL e pg_restore disponíveis"
 
-if ! podman image inspect "$VALIDATOR_IMAGE" >/dev/null; then
+if ! docker_cmd image inspect "$VALIDATOR_IMAGE" >/dev/null; then
   record FAIL validator_image "imagem ausente"
   exit 1
 fi
-if ! podman run --rm --network none --entrypoint python "$VALIDATOR_IMAGE" -c \
+validator_label=$(docker_cmd image inspect "$VALIDATOR_IMAGE" --format '{{index .Config.Labels "io.echora.restore-validator"}}' 2>/dev/null || true)
+if [ "$validator_label" != true ]; then
+  record FAIL validator_image "imagem não possui label de validador descartável"
+  exit 1
+fi
+if ! docker_cmd run --rm --network none --entrypoint python "$VALIDATOR_IMAGE" -c \
   'import cryptography, pydantic, pydantic_settings, psycopg, sqlalchemy'; then
   record FAIL validator_dependencies "dependência ausente na imagem"
   exit 1
 fi
 record PASS validator_dependencies "cryptography, pydantic, psycopg e sqlalchemy presentes"
-podman network create --internal \
+docker_cmd network create --internal \
   --label io.echora.restore-purpose=disposable \
   --label io.echora.restore-instance="$INSTANCE" \
   "$NETWORK" >/dev/null
 created_network=1
 
-podman run -d --rm \
+docker_cmd run -d --rm \
   --name "$INSTANCE" \
   --label io.echora.restore-purpose=disposable \
   --label io.echora.restore-instance="$INSTANCE" \
@@ -115,14 +128,14 @@ podman run -d --rm \
 created_instance=1
 
 for attempt in $(seq 1 60); do
-  if podman exec "$INSTANCE" pg_isready -h 127.0.0.1 -U echora_restore_admin -d "$DB" >/dev/null 2>&1; then
+  if docker_cmd exec "$INSTANCE" pg_isready -h 127.0.0.1 -U echora_restore_admin -d "$DB" >/dev/null 2>&1; then
     break
   fi
   test "$attempt" -lt 60 || { echo 'PostgreSQL descartável não ficou pronto' >&2; exit 1; }
   sleep 1
 done
 
-actual=$(podman exec "$INSTANCE" psql -X -A -t -F '|' -U echora_restore_admin -d "$DB" \
+actual=$(docker_cmd exec "$INSTANCE" psql -X -A -t -F '|' -U echora_restore_admin -d "$DB" \
   -c "SELECT current_database(), current_user;" | tr -d '\r')
 test "$actual" = "$DB|echora_restore_admin" || {
   echo 'identidade do banco temporário não corresponde ao destino' >&2
@@ -133,8 +146,8 @@ echo "identity=$actual" | tee -a "$REPORT"
 # PostgreSQL 16.16 supports these options; -X is intentionally not passed.
 # The custom dump format requires a seekable input file. Copy it only into
 # the disposable container's tmpfs; it is removed before container cleanup.
-podman cp "$BACKUP" "$INSTANCE:/restore-tmp/backup.dump"
-if ! podman exec --user 0 "$INSTANCE" pg_restore \
+docker_cmd cp "$BACKUP" "$INSTANCE:/restore-tmp/backup.dump"
+if ! docker_cmd exec --user 0 "$INSTANCE" pg_restore \
   --exit-on-error \
   --no-owner \
   --no-acl \
@@ -145,10 +158,10 @@ if ! podman exec --user 0 "$INSTANCE" pg_restore \
   record FAIL pg_restore "restauração falhou"
   exit 1
 fi
-podman exec --user 0 "$INSTANCE" rm -f /restore-tmp/backup.dump
+docker_cmd exec --user 0 "$INSTANCE" rm -f /restore-tmp/backup.dump
 record PASS pg_restore "restauração concluída sem erro"
 
-if ! podman exec "$INSTANCE" psql -X -v ON_ERROR_STOP=1 \
+if ! docker_cmd exec "$INSTANCE" psql -X -v ON_ERROR_STOP=1 \
   -v expected_revision="$EXPECTED_ALEMBIC_REVISION" \
   -A -t -F '|' -U echora_restore_admin -d "$DB" <<'SQL' | tee -a "$REPORT"
 DO $$
@@ -242,7 +255,7 @@ record PASS declared_constraints "constraints referenciais validadas; verificaç
 record PASS aes_columns "campos AES presentes e nulabilidade consistente"
 record PASS row_counts "contagens obtidas após as validações"
 
-ORPHANS=$(podman exec "$INSTANCE" psql -X -v ON_ERROR_STOP=1 -A -t -F '|' \
+ORPHANS=$(docker_cmd exec "$INSTANCE" psql -X -v ON_ERROR_STOP=1 -A -t -F '|' \
   -U echora_restore_admin -d "$DB" -c "
 SELECT
   (SELECT count(*) FROM public.maya_questions q
@@ -264,7 +277,7 @@ read -r -s -p 'DATA_ENCRYPTION_ACTIVE_KEY (cofre): ' KEY_ACTIVE; echo >&2
 
 # Rootless/SELinux hosts may deny a bind mount of the workspace. Copy only
 # source code (never .env or keys) into the validator's disposable filesystem.
-podman run -d --rm \
+docker_cmd run -d --rm \
   --name "$VALIDATOR" \
   --label io.echora.restore-purpose=disposable \
   --label io.echora.restore-instance="$INSTANCE" \
@@ -272,7 +285,7 @@ podman run -d --rm \
   --entrypoint sh \
   "$VALIDATOR_IMAGE" -c 'sleep 300' >/dev/null
 created_validator=1
-podman exec --user 0 "$VALIDATOR" mkdir -p /restore-src/backend
+docker_cmd exec --user 0 "$VALIDATOR" mkdir -p /restore-src/backend
 for module in \
   backend/app/__init__.py \
   backend/app/core/__init__.py \
@@ -283,14 +296,14 @@ for module in \
 do
   test -f "$ROOT/$module" || { record FAIL validator_source "módulo ausente: $module"; exit 1; }
   destination="/restore-src/$module"
-  podman exec --user 0 "$VALIDATOR" mkdir -p "$(dirname "$destination")"
-  podman cp "$ROOT/$module" "$VALIDATOR:$destination" >/dev/null
+  docker_cmd exec --user 0 "$VALIDATOR" mkdir -p "$(dirname "$destination")"
+  docker_cmd cp "$ROOT/$module" "$VALIDATOR:$destination" >/dev/null
 done
-podman cp "$ROOT/scripts/validate_restore_crypto.py" "$VALIDATOR:/restore-src/" >/dev/null
+docker_cmd cp "$ROOT/scripts/validate_restore_crypto.py" "$VALIDATOR:/restore-src/" >/dev/null
 
 set +e
 printf '%s\n%s\n%s\n' "$KEY_V1" "$KEY_RING" "$KEY_ACTIVE" \
-  | podman exec -i --user 0 \
+  | docker_cmd exec -i --user 0 \
       -e APP_ENV=test \
       -e DATABASE_URL=sqlite:///:memory: \
       -e ECHORA_RESTORE_ALLOWED_HOST="$PG_ALIAS" \

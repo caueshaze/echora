@@ -1,0 +1,23 @@
+ARG PYTHON_BASE_IMAGE=python:3.13-slim
+FROM ${PYTHON_BASE_IMAGE}
+
+LABEL io.echora.restore-validator=true
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/restore-src
+WORKDIR /restore-src
+
+RUN python -m pip install --no-cache-dir \
+    cryptography==50.0.2 \
+    psycopg[binary]==3.3.9 \
+    pydantic==2.14.3 \
+    pydantic-settings==2.16.3 \
+    SQLAlchemy==2.1.9
+
+COPY backend/app/__init__.py backend/app/__init__.py
+COPY backend/app/core/__init__.py backend/app/core/__init__.py
+COPY backend/app/core/config.py backend/app/core/config.py
+COPY backend/app/core/crypto.py backend/app/core/crypto.py
+COPY backend/scripts/__init__.py backend/scripts/__init__.py
+COPY backend/scripts/rotate_data_encryption.py backend/scripts/rotate_data_encryption.py
+COPY scripts/validate_restore_crypto.py validate_restore_crypto.py
+
+ENTRYPOINT ["python", "/restore-src/validate_restore_crypto.py"]
