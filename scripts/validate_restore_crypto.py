@@ -24,6 +24,34 @@ from backend.scripts.rotate_data_encryption import (
 )
 
 
+class AESConfigurationError(ValueError):
+    """The supplied AES configuration is absent, partial, or invalid."""
+
+
+def settings_from_key_values(values):
+    """Build the exact Settings/_keys configuration supported by the app."""
+    if len(values) != 3:
+        raise AESConfigurationError("configuração AES incompleta")
+    key_v1, key_ring, active = (value.strip() for value in values)
+    if not key_v1:
+        raise AESConfigurationError("DATA_ENCRYPTION_KEY obrigatória")
+    if bool(key_ring) != bool(active):
+        raise AESConfigurationError("configuração AES parcial")
+    if not key_ring and not active:
+        key_ring, active = "{}", "v1"
+    try:
+        settings = Settings(
+            _env_file=None,
+            data_encryption_key=key_v1,
+            data_encryption_keys=key_ring,
+            data_encryption_active_key=active,
+        )
+        _, keys = _keys(settings)
+        return settings, keys
+    except Exception:
+        raise AESConfigurationError("configuração AES inválida") from None
+
+
 def restore_url(raw_url: str):
     """Allow only a named restore database on the explicitly supplied host."""
     try:
@@ -51,17 +79,22 @@ def main(argv=None) -> int:
     args = parser.parse_args([] if argv is None else argv)
     if args.keys_stdin:
         values = [sys.stdin.readline().rstrip("\n") for _ in range(3)]
-        if any(not value for value in values):
-            print("VALIDATION_PENDING: chaves ausentes", file=sys.stderr)
-            return 2
-        os.environ["DATA_ENCRYPTION_KEY"], os.environ["DATA_ENCRYPTION_KEYS"], os.environ["DATA_ENCRYPTION_ACTIVE_KEY"] = values
+        try:
+            settings, keys = settings_from_key_values(values)
+        except AESConfigurationError:
+            print("VALIDATION_FAILED: configuração AES inválida", file=sys.stderr)
+            return 1
+    else:
+        settings = None
+        keys = None
     raw_url = os.environ.get("ECHORA_RESTORE_DATABASE_URL", "")
     try:
         target = restore_url(raw_url)
         if target.database == "echora":
             raise RotationError("banco de produção não é permitido")
-        settings = Settings(_env_file=None)
-        _, keys = _keys(settings)
+        if settings is None:
+            settings = Settings(_env_file=None)
+            _, keys = _keys(settings)
         engine = create_engine(
             target,
             poolclass=NullPool,
