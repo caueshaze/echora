@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRight, EyeOff, Inbox, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { FeedbackSkeletonList } from '../feedback/FeedbackSkeletonList'
-import type { FeedbackPublic, FeedbackTargetType } from '../../lib/types'
+import type { AdminRole, FeedbackPublic, FeedbackTargetType } from '../../lib/types'
 
 type RecentFeedbackTableProps = {
   feedbacks: FeedbackPublic[]
@@ -20,6 +20,7 @@ type RecentFeedbackTableProps = {
 
 type SentimentOrAlertFilter = 'all' | 'positivo' | 'neutro' | 'negativo' | 'triggered'
 type TargetTypeFilter = 'all' | FeedbackTargetType
+type TargetRoleFilter = 'all' | AdminRole
 type AnonymityFilter = 'all' | 'identified' | 'anonymous'
 type SortOrder = 'desc' | 'asc'
 
@@ -57,6 +58,7 @@ export function RecentFeedbackTable({
   const [search, setSearch] = useState('')
   const [sentimentFilter, setSentimentFilter] = useState<SentimentOrAlertFilter>('all')
   const [targetTypeFilter, setTargetTypeFilter] = useState<TargetTypeFilter>('all')
+  const [targetRoleFilter, setTargetRoleFilter] = useState<TargetRoleFilter>('all')
   const [anonymityFilter, setAnonymityFilter] = useState<AnonymityFilter>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
@@ -110,6 +112,12 @@ export function RecentFeedbackTable({
         return false
       }
 
+      if (targetTypeFilter === 'user' && targetRoleFilter !== 'all') {
+        if (feedback.target_role !== targetRoleFilter) {
+          return false
+        }
+      }
+
       const isAnon = isFeedbackAnonymous(feedback)
       if (anonymityFilter === 'anonymous' && !isAnon) return false
       if (anonymityFilter === 'identified' && isAnon) return false
@@ -136,12 +144,13 @@ export function RecentFeedbackTable({
       const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       return sortOrder === 'asc' ? diff : -diff
     })
-  }, [feedbacks, search, sentimentFilter, targetTypeFilter, anonymityFilter, sortOrder])
+  }, [feedbacks, search, sentimentFilter, targetTypeFilter, targetRoleFilter, anonymityFilter, sortOrder])
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
     sentimentFilter !== 'all' ||
     targetTypeFilter !== 'all' ||
+    targetRoleFilter !== 'all' ||
     anonymityFilter !== 'all' ||
     sortOrder !== 'desc'
 
@@ -149,6 +158,7 @@ export function RecentFeedbackTable({
     setSearch('')
     setSentimentFilter('all')
     setTargetTypeFilter('all')
+    setTargetRoleFilter('all')
     setAnonymityFilter('all')
     setSortOrder('desc')
   }
@@ -240,7 +250,11 @@ export function RecentFeedbackTable({
           </div>
 
           {/* Search & Select Filters */}
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            className={`grid gap-2.5 sm:grid-cols-2 ${
+              targetTypeFilter === 'user' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+            }`}
+          >
             <div className="relative">
               <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -256,14 +270,35 @@ export function RecentFeedbackTable({
             <select
               className="input"
               value={targetTypeFilter}
-              onChange={(event) => setTargetTypeFilter(event.target.value as TargetTypeFilter)}
-              aria-label="Filtrar por tipo de destino"
+              onChange={(event) => {
+                const nextType = event.target.value as TargetTypeFilter
+                setTargetTypeFilter(nextType)
+                if (nextType !== 'user') {
+                  setTargetRoleFilter('all')
+                }
+              }}
+              aria-label="Filtrar por tipo de alvo"
             >
-              <option value="all">Todos os destinos</option>
+              <option value="all">Todos os alvos</option>
               <option value="user">Pessoa (Docente / Gestão / Aluno)</option>
               <option value="class">Turma</option>
               <option value="subject">Matéria</option>
             </select>
+
+            {targetTypeFilter === 'user' && (
+              <select
+                className="input animate-fadeUp"
+                value={targetRoleFilter}
+                onChange={(event) => setTargetRoleFilter(event.target.value as TargetRoleFilter)}
+                aria-label="Filtrar por perfil do alvo"
+              >
+                <option value="all">Todos os perfis</option>
+                <option value="professor">Docente (Professor)</option>
+                <option value="aluno">Aluno (Estudante)</option>
+                <option value="gestor">Gestor / Coordenação</option>
+                <option value="admin">Administrador</option>
+              </select>
+            )}
 
             <select
               className="input"
